@@ -1,0 +1,140 @@
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 1
+EXECRH.ASM
+
+
+
+      1				     ;
+      2				     ; File:
+      3				     ;				execrh.asm
+      4				     ; Description:
+      5				     ;		   request handler for calling device drivers
+      6				     ;
+      7				     ;			  Copyright (c)	1995, 1998
+      8				     ;			     Pasquale J. Villani
+      9				     ;			     All Rights	Reserved
+     10				     ;
+     11				     ; This file is part of DOS-C.
+     12				     ;
+     13				     ; DOS-C is	free software; you can redistribute it and/or
+     14				     ; modify it under the terms of the	GNU General Public License
+     15				     ; as published by the Free	Software Foundation; either version
+     16				     ; 2, or (at your option) any later	version.
+     17				     ;
+     18				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+     19				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+     20				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+     21				     ; the GNU General Public License for more details.
+     22				     ;
+     23				     ; You should have received	a copy of the GNU General Public
+     24				     ; License along with DOS-C; see the file COPYING.	If not,
+     25				     ; write to	the Free Software Foundation, 675 Mass Ave,
+     26				     ; Cambridge, MA 02139, USA.
+     27				     ;
+     28				     ; $Logfile:   C:/usr/patv/dos-c/src/kernel/execrh.asv  $
+     29				     ;
+     30				     ; $Header:	  C:/usr/patv/dos-c/src/kernel/execrh.asv   1.3	  06 Dec 1998  8:45:06	 patv  $
+     31				     ;
+     32				     ; $Log:   C:/usr/patv/dos-c/src/kernel/execrh.asv	$
+     33				     ;
+     34				     ;	 Rev 1.3   06 Dec 1998	8:45:06	  patv
+     35				     ;Bug fixes.
+     36				     ;
+     37				     ;	 Rev 1.2   29 May 1996 21:03:30	  patv
+     38				     ;bug fixes	for v0.91a
+     39				     ;
+     40				     ;	 Rev 1.1   01 Sep 1995 17:54:22	  patv
+     41				     ;First GPL	release.
+     42				     ;
+     43				     ;	 Rev 1.0   02 Jul 1995	9:05:34	  patv
+     44				     ;Initial revision.
+     45				     ; $EndLog$
+     46				     ;
+     47
+     48
+     49	0000			     _TEXT	     segment byte public 'CODE'
+     50				     DGROUP	     group   _DATA,_BSS,_BSSEND		     ; small model
+     51						     assume  cs:_TEXT,ds:DGROUP,ss:DGROUP
+     52	0000			     _TEXT	     ends
+     53
+     54	0000			     _DATA	     segment word public 'DATA'
+     55	0000			     _DATA	     ends
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 2
+EXECRH.ASM
+
+
+
+     56
+     57	0000			     _BSS	     segment word public 'BSS'
+     58	0000			     _BSS	     ends
+     59
+     60	0000			     _BSSEND	     segment byte public 'STACK'
+     61	0000			     _BSSEND	     ends
+     62
+     63
+     64	0000			     _TEXT	     segment byte public 'CODE'
+     65						     assume  cs:_TEXT
+     66
+     67
+     68
+     69						     ;
+     70						     ; _execrh
+     71						     ;	     Execute Device Request
+     72						     ;
+     73						     ; execrh(rhp, dhp)
+     74						     ; request far *rhp;
+     75						     ; struct dhdr far *dhp;
+     76						     ;
+     77	0000			     _execrh	     proc    near
+     78						     public _execrh
+     79
+     80	0000  55				     push    bp			     ; perform c entry
+     81	0001  8B EC				     mov     bp,sp
+     82	0003  83 EC 04				     sub     sp,4
+     83	0006  56				     push    si
+     84	0007  1E				     push    ds
+     85	0008  C5 76 08				     lds     si,dword ptr [bp+8]     ; ds:si = device header
+     86	000B  C4 5E 04				     les     bx,dword ptr [bp+4]     ; es:bx = request header
+     87	000E  8B 44 06				     mov     ax,[si+6]		     ; get strategy dword address
+     88	0011  89 46 FC				     mov     word ptr [bp-4],ax	     ; driver offset
+     89	0014  8C 5E FE				     mov     word ptr [bp-2],ds	     ; driver cs = ds from pointer
+     90	0017  FF 5E FC				     call    dword ptr ss:[bp-4]     ;call device strategy
+     91	001A  8B 44 08				     mov     ax,[si+8]		     ;get interrupt dword address
+     92	001D  89 46 FC				     mov     word ptr [bp-4],ax
+     93	0020  FF 5E FC				     call    dword ptr ss:[bp-4]     ;call device interrupt
+     94	0023  1F				     pop     ds
+     95	0024  5E				     pop     si
+     96	0025  8B E5				     mov     sp,bp
+     97	0027  5D				     pop     bp
+     98	0028  C3				     ret
+     99
+    100	0029			     _execrh	     endp
+    101
+    102	0029			     _TEXT	     ends
+    103						     end
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 3
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "12/06/98"
+??FILENAME			  Text	 "EXECRH  "
+??TIME				  Text	 "09:46:53"
+??VERSION			  Number 030A
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _TEXT
+@FILENAME			  Text	 EXECRH
+@WORDSIZE			  Text	 2
+STANDALONE			  Text	 1
+_EXECRH	(_execrh)		  Near	 _TEXT:0000
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _BSS				  16  0000 Word	  Public  BSS
+  _BSSEND			  16  0000 Byte	  Public  STACK
+  _DATA				  16  0000 Word	  Public  DATA
+_TEXT				  16  0029 Byte	  Public  CODE
+

@@ -1,0 +1,225 @@
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 1
+ASMSUPT.ASM
+
+
+
+      1				     ; File:
+      2				     ;			       asmsupt.asm
+      3				     ; Description:
+      4				     ;	     Assembly support routines for miscellaneous functions
+      5				     ;
+      6				     ;			  Copyright (c)	1995, 1998
+      7				     ;			     Pasquale J. Villani
+      8				     ;			     All Rights	Reserved
+      9				     ;
+     10				     ; This file is part of DOS-C.
+     11				     ;
+     12				     ; DOS-C is	free software; you can redistribute it and/or
+     13				     ; modify it under the terms of the	GNU General Public License
+     14				     ; as published by the Free	Software Foundation; either version
+     15				     ; 2, or (at your option) any later	version.
+     16				     ;
+     17				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+     18				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+     19				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+     20				     ; the GNU General Public License for more details.
+     21				     ;
+     22				     ; You should have received	a copy of the GNU General Public
+     23				     ; License along with DOS-C; see the file COPYING.	If not,
+     24				     ; write to	the Free Software Foundation, 675 Mass Ave,
+     25				     ; Cambridge, MA 02139, USA.
+     26				     ;
+     27				     ; $Logfile:   C:/usr/patv/dos-c/src/kernel/asmsupt.asv  $
+     28				     ;
+     29				     ; $Header:	  C:/usr/patv/dos-c/src/kernel/asmsupt.asv   1.4   06 Dec 1998	8:46:50	  patv	$
+     30				     ;
+     31				     ; $Log:   C:/usr/patv/dos-c/src/kernel/asmsupt.asv	 $
+     32				     ;
+     33				     ;	  Rev 1.4   06 Dec 1998	 8:46:50   patv
+     34				     ; Bug fixes.
+     35				     ;
+     36				     ;	  Rev 1.3   03 Jan 1998	 8:36:44   patv
+     37				     ; Converted data area to SDA format
+     38				     ;
+     39				     ;	  Rev 1.2   29 May 1996	21:03:38   patv
+     40				     ; bug fixes for v0.91a
+     41				     ;
+     42				     ;	  Rev 1.1   01 Sep 1995	17:54:26   patv
+     43				     ; First GPL release.
+     44				     ;
+     45				     ;	  Rev 1.0   05 Jul 1995	11:38:42   patv
+     46				     ; Initial revision.
+     47				     ; $EndLog$
+     48				     ;
+     49
+     50
+     51	0000			     _TEXT	     segment byte public 'CODE'
+     52				     DGROUP	     group   _DATA,_BSS,_BSSEND		     ; small model
+     53						     assume  cs:_TEXT,ds:DGROUP,ss:DGROUP
+     54	0000			     _TEXT	     ends
+     55
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 2
+ASMSUPT.ASM
+
+
+
+     56	0000			     _DATA	     segment word public 'DATA'
+     57	0000			     _DATA	     ends
+     58
+     59	0000			     _BSS	     segment word public 'BSS'
+     60	0000			     _BSS	     ends
+     61
+     62	0000			     _BSSEND	     segment byte public 'STACK'
+     63	0000			     _BSSEND	     ends
+     64
+     65
+     66
+     67	0000			     _TEXT	     segment byte public 'CODE'
+     68				     ;
+     69				     ;	     VOID bcopy(s, d, n)
+     70				     ;	     REG BYTE *s, *d;
+     71				     ;	     REG COUNT n;
+     72				     ;
+     73				     ;
+     74						     assume  cs:_TEXT
+     75						     public  _bcopy
+     76	0000			     _bcopy	     proc    near
+     77	0000  55				     push    bp			     ; Standard	C entry
+     78	0001  8B EC				     mov     bp,sp
+     79	0003  56				     push    si
+     80	0004  57				     push    di
+     81	0005  06				     push    es
+     82
+     83						     ; Get the repitition count, n
+     84	0006  8B 4E 08				     mov     cx,[bp+8]
+     85	0009  0B C9				     or	     cx,cx
+     86	000B  74 17				     jz	     short bcopy_exit
+     87
+     88						     ; Set both	ds and es to same segment (for near copy)
+     89	000D  8C D8				     mov	     ax,ds
+     90	000F  8E C0				     mov	     es,ax
+     91
+     92						     ; Get the source pointer, ss
+     93	0011  8B 76 04				     mov	     si,[bp+4]
+     94
+     95						     ; and the destination pointer, d
+     96	0014  8B 7E 06				     mov	     di,[bp+6]
+     97
+     98						     ; Set direction to	autoincrement
+     99	0017  FC				     cld
+    100
+    101						     ; And do the built-in byte	copy, but do a 16-bit transfer
+    102						     ; whenever	possible.
+    103	0018  51				     push    cx
+    104	0019  83 E1 01				     and     cx,1	     ; test for	odd count
+    105	001C  59				     pop cx
+    106	001D  74 01				     jz	     b_even
+    107	001F  A4				     movsb
+    108	0020  D1 E9		     b_even:	     shr     cx,1
+    109	0022  F3> A5				     rep     movsw
+    110
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 3
+ASMSUPT.ASM
+
+
+
+    111						     ; Finally do a C exit to return
+    112	0024  07		     bcopy_exit:     pop     es
+    113	0025  5F				     pop     di
+    114	0026  5E				     pop     si
+    115	0027  5D				     pop     bp
+    116	0028  C3				     ret
+    117	0029			     _bcopy	     endp
+    118
+    119
+    120				     ;
+    121				     ;	     VOID fbcopy(s, d, n)
+    122				     ;
+    123				     ;	     REG VOID FAR *s, FAR *d;
+    124				     ;	     REG COUNT n;
+    125						     assume  cs:_TEXT
+    126						     public  _fbcopy
+    127	0029			     _fbcopy	     proc    near
+    128	0029  55				     push    bp		     ; Standard	C entry
+    129	002A  8B EC				     mov     bp,sp
+    130	002C  56				     push    si
+    131	002D  57				     push    di
+    132
+    133						     ; Save ds,	since we won't necessarily be within our
+    134						     ; small/tiny environment
+    135	002E  1E				     push    ds
+    136	002F  06				     push    es
+    137
+    138						     ; Get the repititon count,	n
+    139	0030  8B 4E 0C				     mov     cx,[bp+12]
+    140	0033  0B C9				     or	     cx,cx
+    141	0035  74 13				     jz	     short fbcopy_exit
+    142
+    143						     ; Get the far source pointer, s
+    144	0037  C5 76 04				     lds     si,DWORD PTR [bp+4]
+    145
+    146						     ; Get the far destination pointer d
+    147	003A  C4 7E 08				     les     di,DWORD PTR [bp+8]
+    148
+    149						     ; Set direction to	autoincrement
+    150	003D  FC				     cld
+    151
+    152						     ; And do the built-in byte	copy, but do a 16-bit transfer
+    153						     ; whenever	possible.
+    154	003E  51				     push    cx
+    155	003F  83 E1 01				     and     cx,1	     ; test for	odd count
+    156	0042  59				     pop cx
+    157	0043  74 01				     jz	     fb_even
+    158	0045  A4				     movsb
+    159	0046  D1 E9		     fb_even:	     shr     cx,1
+    160	0048  F3> A5				     rep     movsw
+    161
+    162						     ; recover ds
+    163	004A  07		     fbcopy_exit:    pop     es
+    164	004B  1F				     pop     ds
+    165
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 4
+ASMSUPT.ASM
+
+
+
+    166						     ; Do a standard C exit and	return
+    167	004C  5F				     pop     di
+    168	004D  5E				     pop     si
+    169	004E  5D				     pop     bp
+    170	004F  C3				     ret
+    171	0050			     _fbcopy	     endp
+    172	0050			     _TEXT	     ENDS
+    173						     end
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 5
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "12/06/98"
+??FILENAME			  Text	 "ASMSUPT "
+??TIME				  Text	 "09:46:53"
+??VERSION			  Number 030A
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _TEXT
+@FILENAME			  Text	 ASMSUPT
+@WORDSIZE			  Text	 2
+BCOPY_EXIT			  Near	 _TEXT:0024
+B_EVEN				  Near	 _TEXT:0020
+FBCOPY_EXIT			  Near	 _TEXT:004A
+FB_EVEN				  Near	 _TEXT:0046
+STANDALONE			  Text	 1
+_BCOPY (_bcopy)			  Near	 _TEXT:0000
+_FBCOPY	(_fbcopy)		  Near	 _TEXT:0029
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _BSS				  16  0000 Word	  Public  BSS
+  _BSSEND			  16  0000 Byte	  Public  STACK
+  _DATA				  16  0000 Word	  Public  DATA
+_TEXT				  16  0050 Byte	  Public  CODE
+

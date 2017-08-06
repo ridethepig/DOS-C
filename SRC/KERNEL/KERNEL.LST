@@ -1,0 +1,954 @@
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 1
+kernel.ASM
+
+
+
+      1				     ;
+      2				     ; File:
+      3				     ;				kernel.asm
+      4				     ; Description:
+      5				     ;			     kernel start-up code
+      6				     ;
+      7				     ;			  Copyright (c)	1995, 1996
+      8				     ;			     Pasquale J. Villani
+      9				     ;			     All Rights	Reserved
+     10				     ;
+     11				     ; This file is part of DOS-C.
+     12				     ;
+     13				     ; DOS-C is	free software; you can redistribute it and/or
+     14				     ; modify it under the terms of the	GNU General public License
+     15				     ; as published by the Free	Software Foundation; either version
+     16				     ; 2, or (at your option) any later	version.
+     17				     ;
+     18				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+     19				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+     20				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+     21				     ; the GNU General public License for more details.
+     22				     ;
+     23				     ; You should have received	a copy of the GNU General public
+     24				     ; License along with DOS-C; see the file COPYING.	If not,
+     25				     ; write to	the Free Software Foundation, 675 Mass Ave,
+     26				     ; Cambridge, MA 02139, USA.
+     27				     ;
+     28				     ; $Header:	  C:/usr/patv/dos-c/src/kernel/kernel.asv   1.11   06 Dec 1998	8:48:04	  patv	$
+     29				     ;
+     30				     ; $Log:   C:/usr/patv/dos-c/src/kernel/kernel.asv	$
+     31				     ;
+     32				     ;	 Rev 1.11   06 Dec 1998	 8:48:04   patv
+     33				     ;Bug fixes.
+     34				     ;
+     35				     ;	 Rev 1.10   03 Feb 1998	23:30:08   patv
+     36				     ;Added a start-up stack for loadable device drivers.  Need	the separate
+     37				     ;stack so that all	int 21h	functions can be called.
+     38				     ;
+     39				     ;	 Rev 1.9   22 Jan 1998	4:09:24	  patv
+     40				     ;Fixed pointer problems affecting SDA
+     41				     ;
+     42				     ;	 Rev 1.8   06 Jan 1998 20:12:32	  patv
+     43				     ;Reduced device driver stack sizes.
+     44				     ;
+     45				     ;	 Rev 1.7   04 Jan 1998 17:26:18	  patv
+     46				     ;Corrected	subdirectory bug
+     47				     ;
+     48				     ;	 Rev 1.6   03 Jan 1998	8:36:50	  patv
+     49				     ;Converted	data area to SDA format
+     50				     ;
+     51				     ;	 Rev 1.5   06 Feb 1997 22:43:18	  patv
+     52				     ;Reduced stack sizes for block and	clock devices.
+     53				     ;
+     54				     ;	 Rev 1.4   06 Feb 1997 19:05:48	  patv
+     55				     ;Added hooks for tsc command
+     56				     ;
+     57				     ;	 Rev 1.3   29 May 1996 21:03:44	  patv
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 2
+kernel.ASM
+
+
+
+     58				     ;bug fixes	for v0.91a
+     59				     ;
+     60				     ;	 Rev 1.2   19 Feb 1996	3:24:06	  patv
+     61				     ;Added NLS, int2f and config.sys processing
+     62				     ;
+     63				     ;	 Rev 1.1   01 Sep 1995 17:54:24	  patv
+     64				     ;First GPL	release.
+     65				     ;
+     66				     ;	 Rev 1.0   02 Jul 1995	9:05:44	  patv
+     67				     ;Initial revision.
+     68				     ;
+     69				     ; $EndLog$
+     70				     ;
+     71
+     72
+     73						     include segs.inc
+1    74				     ; File:
+1    75				     ;				 segs.inc
+1    76				     ; Description:
+1    77				     ;	   Segment definitions for the kernel
+1    78				     ;
+1    79				     ;			     Copyright (c) 1998
+1    80				     ;			     Pasquale J. Villani
+1    81				     ;			     All Rights	Reserved
+1    82				     ;
+1    83				     ; This file is part of DOS-C.
+1    84				     ;
+1    85				     ; DOS-C is	free software; you can redistribute it and/or
+1    86				     ; modify it under the terms of the	GNU General Public License
+1    87				     ; as published by the Free	Software Foundation; either version
+1    88				     ; 2, or (at your option) any later	version.
+1    89				     ;
+1    90				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+1    91				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+1    92				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+1    93				     ; the GNU General Public License for more details.
+1    94				     ;
+1    95				     ; You should have received	a copy of the GNU General Public
+1    96				     ; License along with DOS-C; see the file COPYING.	If not,
+1    97				     ; write to	the Free Software Foundation, 675 Mass Ave,
+1    98				     ; Cambridge, MA 02139, USA.
+1    99				     ;
+1   100				     ; $Logfile:   C:/usr/patv/dos-c/src/kernel/segs.inv  $
+1   101				     ;
+1   102				     ; $Header:	  C:/usr/patv/dos-c/src/kernel/segs.inv	  1.0	06 Dec 1998  8:12:36   patv  $
+1   103				     ;
+1   104				     ; $Log:   C:/usr/patv/dos-c/src/kernel/segs.inv  $
+1   105				     ;
+1   106				     ;	  Rev 1.0   06 Dec 1998	 8:12:36   patv
+1   107				     ; Initial revision.
+1   108				     ; $EndLog
+1   109				     ;
+1   110
+1   111	0000			     _TEXT	     segment byte public 'CODE'
+1   112				     TGROUP	     group   _TEXT,_IO_TEXT,_IO_FIXED_DATA
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 3
+kernel.ASM
+
+
+
+1   113				     DGROUP	     group   _FIXED_DATA,_DATA,_BSS,_BSSEND  ; small model
+1   114						     assume  cs:TGROUP,ds:DGROUP,ss:DGROUP
+1   115	0000			     _TEXT	     ends
+1   116
+1   117	0000			     _IO_TEXT	     segment byte public 'CODE'
+1   118	0000			     _IO_TEXT	     ends
+1   119
+1   120	0000			     _IO_FIXED_DATA  segment word public 'CODE'
+1   121	0000			     _IO_FIXED_DATA  ends
+1   122
+1   123	0000			     _FIXED_DATA     segment para public 'DATA'
+1   124	0000			     _FIXED_DATA     ends
+1   125
+1   126	0000			     _DATA	     segment word public 'DATA'
+1   127	0000			     _DATA	     ends
+1   128
+1   129	0000			     _BSS	     segment word public 'BSS'
+1   130	0000			     _BSS	     ends
+1   131
+1   132	0000			     _BSSEND	     segment byte public 'STACK'
+1   133	0000			     _BSSEND	     ends
+1   134
+1   135
+    136
+    137
+    138	0000			     _TEXT	     segment byte public 'CODE'
+    139						     assume  cs:_TEXT
+    140
+    141						     extrn   _main:near
+    142						     extrn   _reinit_k:near
+    143						     extrn   _con_driver:near
+    144						     extrn   _ReqPktPtr:dword
+    145
+    146	      =00C0		     STACK_SIZE	     equ     384/2	     ; stack allocated in words
+    147
+    148
+    149						     ;
+    150						     ;
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 4
+kernel.ASM
+
+
+
+    151
+    152
+    153
+    154						     ;
+    155						     ;
+    156	0000			     entry	     proc    near
+    157						     extrn   _reinit_k:near
+    158	0000  EB 09				     jmp     short kernel_start	     ; initialization entry
+    159	0002  E9 0000e				     jmp     _reinit_k		     ; re-init entry
+    160	0005  0000s		     _OsText	     dw	     _TEXT		     ; Code Segment
+    161	0007  0000s		     _OsData	     dw	     DGROUP		     ; Data Segment
+    162	0009  0100		     _OsVersion	     dw	     0100h		     ; OS version
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 5
+kernel.ASM
+
+
+
+    163						     ;
+    164						     ; kernel start-up
+    165						     ;
+    166	000B  FA		     kernel_start:   cli		     ; prevent interrupts while	starting
+    167	000C  B8 0000s				     mov     ax,DGROUP
+    168	000F  8E D0				     mov     ss,ax
+    169	0011  BC 0602r				     mov     sp,offset DGROUP:tos
+    170						     ; inititalize entry stack for high	water tests
+    171				     ;		     mov     di,seg stack_bottom
+    172				     ;		     mov     es,di
+    173				     ;		     mov     di,offset stack_bottom
+    174				     ;		     mov     ax,offset last
+    175				     ;		     sub     ax,di
+    176				     ;		     sar     ax,1
+    177				     ;		     mov     cx,ax
+    178				     ;		     mov     ax,09090h
+    179				     ;		     cld
+    180				     ;		     rep     stosw
+    181						     ; inititalize api stacks for high water tests
+    182	0014  BF 0000s				     mov     di,seg apistk_bottom
+    183	0017  8E C7				     mov     es,di
+    184	0019  BF 0620r				     mov     di,offset apistk_bottom
+    185	001C  B8 0AA0r				     mov     ax,offset apistk_top
+    186	001F  2B C7				     sub     ax,di
+    187	0021  D1 F8				     sar     ax,1
+    188	0023  8B C8				     mov     cx,ax
+    189	0025  B8 9090				     mov     ax,09090h
+    190	0028  FC				     cld
+    191	0029  F3> AB				     rep     stosw
+    192						     ; Now set up call frame
+    193	002B  8C D0				     mov     ax,ss
+    194	002D  8E D8				     mov     ds,ax
+    195	002F  8E C0				     mov     es,ax
+    196	0031  8B EC				     mov     bp,sp	     ; and set up stack	frame for c
+    197	0033  FB				     sti		     ; now enable them
+    198	0034  89 1E 0069r			     mov     _BootDrive,bx   ; tell where we came from
+    199	0038  89 0E 0000r			     mov     _NumFloppies,cx ; and how many
+    200
+    201	003C  8C D8				     mov     ax,ds
+    202	003E  8E C0				     mov     es,ax
+    203	0040  E8 0000e				     call    _main
+    204	0043  B8 0000				     mov     ax,0
+    205	0046  50				     push    ax
+    206	0047  E8 0002				     call    _exit
+    207	004A  EB FE				     jmp     $
+    208	004C			     entry	     endp
+    209
+    210
+    211						     ;
+    212						     ; _exit
+    213						     ;	     perform an	"exit" and quit
+    214						     ;
+    215						     ; exit(code)
+    216						     ; int code;
+    217						     ;
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 6
+kernel.ASM
+
+
+
+    218	004C			     _exit	     proc    near
+    219						     public  _exit
+    220
+    221	004C  FA				     cli
+    222	004D  F4				     hlt
+    223	004E  EB FC				     jmp     _exit
+    224
+    225	0050			     _exit	     endp
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 7
+kernel.ASM
+
+
+
+    226
+    227
+    228						     ;
+    229						     ; NUL device strategy
+    230						     ;
+    231	0050			     _nul_strtgy     proc    far
+    232						     public _nul_strtgy
+    233	0050  2E: 89 1E	0000e			     mov     word ptr _ReqPktPtr,bx	  ;save	rq headr
+    234	0055  2E: 8C 06	0002e			     mov     word ptr _ReqPktPtr+2,es
+    235	005A  CB				     ret
+    236	005B			     _nul_strtgy     endp
+    237
+    238						     ;
+    239						     ; NUL device interrupt
+    240						     ;
+    241	005B			     _nul_intr	     proc    far
+    242						     public _nul_intr
+    243	005B  06				     push    es
+    244	005C  53				     push    bx
+    245	005D  2E: C4 1E	0000e			     les     bx,_ReqPktPtr		  ;es:bx--> rqheadr
+    246	0062  26: 81 4F	03 0100			     or	     word ptr es:[bx+3],100h ;set "done" flag
+    247	0068  5B				     pop     bx
+    248	0069  07				     pop     es
+    249	006A  CB				     ret
+    250	006B			     _nul_intr	     endp
+    251
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 8
+kernel.ASM
+
+
+
+    252				     ;
+    253				     ; special interrupt routine for break key handling
+    254				     ;
+    255
+    256				     ;
+    257				     ;	     void interrupt break_key(void)
+    258				     ;
+    259					     extrn   _break_handler:near
+    260					     assume  cs:_TEXT
+    261						     public  _break_key
+    262	006B			     _break_key	     proc    far
+    263	006B  50				     push    ax
+    264	006C  53				     push    bx
+    265	006D  51				     push    cx
+    266	006E  52				     push    dx
+    267	006F  06				     push    es
+    268	0070  1E				     push    ds
+    269	0071  56				     push    si
+    270	0072  57				     push    di
+    271	0073  55				     push    bp
+    272	0074  BD 0000s				     mov     bp,DGROUP
+    273	0077  8E DD				     mov     ds,bp
+    274						     ;
+    275	0079  89 26 0002r			     mov     word ptr DGROUP:intr_dos_stk,sp ; use internal stack
+    276	007D  8C 16 0004r			     mov     word ptr DGROUP:intr_dos_seg,ss
+    277	0081  9C				     pushf			     ; put flags in bx
+    278	0082  5B				     pop     bx
+    279	0083  FA				     cli			     ; no interrupts
+    280	0084  8C D8				     mov     ax,ds		     ; get stack seg
+    281	0086  8E D0				     mov     ss,ax
+    282	0088  BC 0600r				     mov     sp,offset DGROUP:intr_stk_top
+    283	008B  53				     push    bx
+    284	008C  9D				     popf			     ; restore interrupt flag
+    285	008D  8B EC				     mov     bp,sp		     ; make a c	frame
+    286	008F  E8 0000e				     call    _break_handler	     ; call handler
+    287						     ;
+    288	0092  9C				     pushf
+    289	0093  5B				     pop     bx
+    290	0094  FA				     cli			     ; no interrupts
+    291	0095  8B 26 0002r			     mov     sp,word ptr DGROUP:intr_dos_stk ; use dos stack
+    292	0099  8E 16 0004r			     mov     ss,word ptr DGROUP:intr_dos_seg
+    293	009D  53				     push    bx
+    294	009E  9D				     popf
+    295	009F  5D				     pop     bp
+    296	00A0  5F				     pop     di
+    297	00A1  5E				     pop     si
+    298	00A2  1F				     pop     ds
+    299	00A3  07				     pop     es
+    300	00A4  5A				     pop     dx
+    301	00A5  59				     pop     cx
+    302	00A6  5B				     pop     bx
+    303	00A7  58				     pop     ax
+    304	00A8  CF				     iret
+    305	00A9			     _break_key	     endp
+    306
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 9
+kernel.ASM
+
+
+
+    307	00A9			     _TEXT	     ends
+    308
+    309
+    310	0000			     _FIXED_DATA     segment para public 'DATA'
+    311
+    312				     ; Because of the following	bytes of data, THIS MODULE MUST	BE THE FIRST
+    313				     ; IN THE LINK SEQUENCE.  THE BYTE AT DS:0004 determines the SDA format in
+    314				     ; use.  A 0 indicates MS-DOS 3.X style, a 1 indicates MS-DOS 4.0-6.X style.
+    315						     public  DATASTART
+    316	0000			     DATASTART	     label   byte
+    317	0000  00		     dos_data	     db	     0
+    318	0001  000Br				     dw	     kernel_start
+    319	0003  00				     db	     (?)	     ; padding
+    320	0004  0001				     dw	     1		     ; Hardcoded MS-DOS	4.0+ style
+    321
+    322	0006  14*(??)				     db	     (26h - 0ch	- (offset $ - DATASTART)) dup (?)
+    323
+    324				     ; Globally	referenced variables - WARNING:	DO NOT CHANGE ORDER
+    325				     ; BECAUSE THEY ARE	DOCUMENTED AS UNDOCUMENTED (?) AND HAVE
+    326				     ; MANY MULTIPLEX PROGRAMS AND TSR'S ACCESSING THEM
+    327						     public  _NetRetry
+    328	001A  0003		     _NetRetry	     dw	     3		     ;-000c network retry count
+    329						     public  _NetDelay
+    330	001C  0001		     _NetDelay	     dw	     1		     ;-000a network delay count
+    331						     public  _DskBuffer
+    332	001E  FFFFFFFF		     _DskBuffer	     dd	     -1		     ;-0008 current dos	disk buffer
+    333	0022  0000				     dw	     (?)	     ;-0004 Unread con input
+    334						     public  _first_mcb
+    335	0024  0000		     _first_mcb	     dw	     (?)	     ;-0002 Start of user memory
+    336						     public  _DPBp
+    337						     public  MARK0026H
+    338				     ; A reference seems to indicate that this should start at offset 26h.
+    339	      =_FIXED_DATA:0026	     MARK0026H	     equ     $
+    340	0026  00000000		     _DPBp	     dd	     (?)	     ; 0000 First drive	Parameter Block
+    341						     public  _sfthead
+    342	002A  00000000		     _sfthead	     dd	     (?)	     ; 0004 System File	Table head
+    343						     public  _clock
+    344	002E  00000000		     _clock	     dd	     (?)	     ; 0008 CLOCK$ device
+    345						     public  _syscon
+    346	0032  00000000		     _syscon	     dd	     (?)	     ; 000c console device
+    347						     public  _maxbksize
+    348	0036  0000		     _maxbksize	     dw	     (?)	     ; 0010 Number of Drives in	system
+    349						     public  _firstbuf;
+    350	0038  00000000		     _firstbuf	     dd	     (?)	     ; 0012 head of buffers linked list
+    351						     public  _CDSp
+    352	003C  00000000		     _CDSp	     dd	     (?)	     ; 0016 Current Directory Structure
+    353						     public  _FCBp
+    354	0040  00000000		     _FCBp	     dd	     (?)	     ; 001a FCB	table pointer
+    355						     public  _nprotfcb
+    356	0044  0000		     _nprotfcb	     dw	     (?)	     ; 001e number of protected	fcbs
+    357						     public  _nblkdev
+    358	0046  00		     _nblkdev	     db	     (?)	     ; 0020 number of block devices
+    359						     public  _lastdrive
+    360	0047  00		     _lastdrive	     db	     (?)	     ; 0021 value of last drive
+    361						     public  _nul_dev
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 10
+kernel.ASM
+
+
+
+    362	0048			     _nul_dev	     label   dword	     ; 0022 device chain root
+    363	0048  FFFFFFFF				     dd	     -1
+    364	004C  8004				     dw	     8004h	     ; attributes = char device, NUL bit set
+    365	004E  0050r				     dw	     offset _nul_strtgy
+    366	0050  005Br				     dw	     offset _nul_intr
+    367	0052  4E 55 4C 20 20 20	20+		     db	     'NUL     '
+    368	      20
+    369						     public  _njoined
+    370	005A  00		     _njoined	     db	     (?)	     ; 0034 number of joined devices
+    371	005B  0000				     dw	     0		     ; 0035 DOS	4 pointer to special names (always zero	in +
+    372				     DOS 5)
+    373	005D  0000 0000		     setverPtr	     dw	     0,0	     ; 0037 setver list
+    374	0061  0000				     dw	     0		     ; 003B cs offset for fix a20
+    375	0063  0000				     dw	     0		     ; 003D psp	of last	umb exec
+    376	0065  0001				     dw	     1		     ; 003F number of buffers
+    377	0067  0001				     dw	     1		     ; 0041 size of pre-read buffer
+    378						     public  _BootDrive
+    379	0069  0000		     _BootDrive	     dw	     (?)	     ; 0043 drive we booted from
+    380	006B  00				     db	     0		     ; 0044 cpu	type (1	if >=386)
+    381	006C  0000				     dw	     0		     ; 0045 Extended memory in KBytes
+    382	006E  00000000		     buf_info	     dd	     (?)	     ; 0047 disk buffer	chain
+    383	0072  0000				     dw	     0		     ; 004B 0 (DOS 4 = # hashing chains)
+    384	0074  00000000				     dd	     (?)	     ; 004D pre-read buffer
+    385	0078  0000				     dw	     0		     ; 0051 # of sectors
+    386	007A  00				     db	     0		     ; 0053 00=conv 01=HMA
+    387	007B  0000				     dw	     0		     ; 0054 deblock buf	in conv
+    388	007D  0000		     deblock_seg     dw	     0		     ; 0056 (offset always zero)
+    389	007F  03*(??)				     db	     3 dup (?)	     ; 0058 unknown
+    390	0082  0000				     dw	     0		     ; 005B unknown
+    391	0084  00 FF 00				     db	     0,	0FFh, 0	     ; 005D unknown
+    392	0087  00				     db	     0		     ; 0060 unknown
+    393	0088  0000				     dw	     0		     ; 0061 unknown
+    394	008A  00		     dmd_upper_link  db	     0		     ; 0063 upper memory link flag
+    395	008B  0000				     dw	     0		     ; 0064 unknown
+    396	008D  FFFF		     dmd_upper_root  dw	     0FFFFh	     ; 0066 dmd_upper_root
+    397	008F  0000				     dw	     0		     ; 0068 para of last mem search
+    398	0091			     SysVarEnd	     label   byte
+    399
+    400
+    401				     ; Some references seem to indicate	that this data should start at 01fbh in
+    402				     ; order to	maintain 100% MS-DOS compatibility.
+    403	0091  016A*(??)				     db	     (01fbh - (SysVarEnd - DATASTART)) dup (?)
+    404
+    405						     public  MARK01FBH
+    406	      =_FIXED_DATA:01FB	     MARK01FBH	     equ     $
+    407	01FB  80*(??)				     db	     128 dup (?)
+    408						     public  _kb_buf
+    409	027B  81 00		     _kb_buf db	     129,0		     ; initialise buffer to empty
+    410	027D  81*(??)				     db	     128+1 dup (?)   ; room for	128 byte readline + LF
+    411				     ;
+    412				     ; Variables that follow are documented as part of the DOS 4.0-6.X swappable
+    413				     ; data area in Ralf Browns	Interrupt List #56
+    414				     ;
+    415				     ; this byte is used for ^P	support
+    416						     public  _PrinterEcho
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 11
+kernel.ASM
+
+
+
+    417	02FE  00		     _PrinterEcho    db	     0		     ;-34 -  0 = no printer echo, ~0 echo
+    418						     public  _verify_ena
+    419	02FF  00		     _verify_ena     db	     0		     ; ~0, write with verify
+    420
+    421				     ; this byte is used for TAB's
+    422						     public _scr_pos
+    423	0300  00		     _scr_pos	     db	     0		     ; Current Cursor Column
+    424						     public  _switchar
+    425	0301  2F		     _switchar	     db	     '/'	     ;-31 - switch char
+    426						     public  _mem_access_mode
+    427	0302  00		     _mem_access_mode db     0		     ;-30 -  memory allocation strategy
+    428						     public  sharing_flag
+    429	0303  00		     sharing_flag    db	     0		     ; 00 = sharing module not loaded
+    430									     ; 01 = sharing module loaded, but
+    431									     ;	    open/close for block devices
+    432									     ;	    disabled
+    433									     ; FF = sharing module loaded,
+    434									     ;	    open/close for block devices
+    435									     ;	    enabled (not implemented)
+    436						     public  net_set_count
+    437	0304  01		     net_set_count   db	     1		     ;-28 -  count the name below was set
+    438						     public  net_name
+    439	0305  20 20 20 20 20 20	20+  net_name	     db	     '		     ' ;-27 - 15 Character Network Name
+    440	      20 20 20 20 20 20	20+
+    441	      20
+    442	0314  00				     db	     00		       ; Terminating 0 byte
+    443
+    444
+    445				     ;
+    446				     ;	     Variables contained the the "STATE_DATA" segment contain
+    447				     ;	     information about the STATE of the	current	DOS Process. These
+    448				     ;	     variables must be preserved regardless of the state of the	INDOS
+    449				     ;	     flag.
+    450				     ;
+    451				     ;	     All variables that	appear in "STATE_DATA" **MUST**	be declared
+    452				     ;	     in	this file as the offsets from the INTERNAL_DATA	variable are
+    453				     ;	     critical to the DOS applications that modify this data area.
+    454				     ;
+    455				     ;
+    456						     public  _ErrorMode, _InDOS
+    457						     public  _CritErrLocus, _CritErrCode
+    458						     public  _CritErrAction, _CritErrClass
+    459						     public  _CritErrDev, _CritErrDrive
+    460						     public  _dta
+    461						     public  _cu_psp, _default_drive
+    462						     public  _break_ena
+    463						     public  _return_code, _return_mode
+    464						     public  _internal_data
+    465
+    466						     public  _CritPatch
+    467	0315  0D0C		     _CritPatch	     dw	     0d0ch	     ;-11 zero list of patched critical
+    468	0317  0D0C				     dw	     0d0ch	     ;	  section variables
+    469	0319  0D0C				     dw	     0d0ch
+    470	031B  0D0C				     dw	     0d0ch
+    471	031D  0D0C				     dw	     0d0ch
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 12
+kernel.ASM
+
+
+
+    472	031F  00				     db	     (?)	     ;-01 - unknown
+    473	0320			     _internal_data  label byte		     ; <-- Address returned by INT21/5D06
+    474	0320  00		     _ErrorMode	     db	     0		     ; 00 - Critical Error Flag
+    475	0321  00		     _InDOS	     db	     0		     ; 01 - Indos Flag
+    476	0322  00		     _CritErrDrive   db	     0		     ; 02 - Drive on write protect error
+    477	0323  00		     _CritErrLocus   db	     0		     ; 03 - Error Locus
+    478	0324  0000		     _CritErrCode    dw	     0		     ; 04 - DOS	format error Code
+    479	0326  00		     _CritErrAction  db	     0		     ; 06 - Error Action Code
+    480	0327  00		     _CritErrClass   db	     0		     ; 07 - Error Class
+    481	0328  00000000		     _CritErrDev     dd	     (?)	     ; 08 - Failing Device Address
+    482	032C  00000000		     _dta	     dd	     (?)	     ; 0C - current DTA
+    483	0330  0000		     _cu_psp	     dw	     (?)	     ; 10 - Current PSP
+    484	0332  0000		     break_sp	     dw	     (?)	     ; 12 - used in int	23
+    485	0334  00		     _return_code    db	     0		     ; 14 - return code	from process
+    486	0335  00		     _return_mode    db	     0		     ; 15 - reason for process terminate
+    487	0336  00		     _default_drive  db	     0		     ; 16 - Current Drive
+    488	0337  00		     _break_ena	     db	     0		     ; 17 - Break Flag
+    489	0338  00				     db	     0		     ; 18 - flag, code page switching
+    490	0339  00				     db	     0		     ; 19 - flag, copy of 18 on	int 24h	abort
+    491
+    492						     public  _swap_always, _swap_indos
+    493	033A			     _swap_always    label   byte
+    494
+    495						     public  _Int21AX
+    496	033A  0000		     _Int21AX	     dw	     0		     ; 1A - AX from last Int 21
+    497
+    498						     public  owning_psp, _MachineId
+    499	033C  0000		     owning_psp	     dw	     0		     ; 1C - owning psp
+    500	033E  0000		     _MachineId	     dw	     0		     ; 1E - remote machine ID
+    501	0340  0000				     dw	     0		     ; 20 - First usable mcb
+    502	0342  0000				     dw	     0		     ; 22 - Best usable	mcb
+    503	0344  0000				     dw	     0		     ; 24 - Last usable	mcb
+    504	0346  0000				     dw	     0		     ; 26 - memory size	in paragraphs
+    505	0348  0000				     dw	     0		     ; 28 - unknown
+    506	034A  00				     db	     0		     ; 2A - unknown
+    507	034B  00				     db	     0		     ; 2B - unknown
+    508	034C  00				     db	     0		     ; 2C - unknown
+    509						     public  _break_flg
+    510	034D  00		     _break_flg	     db	     0		     ; 2D - Program aborted by ^C
+    511	034E  00				     db	     0		     ; 2E - unknown
+    512	034F  00				     db	     0		     ; 2F - not	referenced
+    513						     public  _DayOfMonth
+    514	0350  01		     _DayOfMonth     db	     1		     ; 30 - day	of month
+    515						     public  _Month
+    516	0351  01		     _Month	     db	     1		     ; 31 - month
+    517						     public  _YearsSince1980
+    518	0352  0000		     _YearsSince1980 dw	     0		     ; 32 - year since 1980
+    519	0354  FFFF		     daysSince1980   dw	     0FFFFh	     ; 34 - number of days since epoch
+    520									     ; force rebuild on	first clock read
+    521						     public  _DayOfWeek
+    522	0356  02		     _DayOfWeek	     db	     2		     ; 36 - day	of week
+    523						     public  _Year
+    524	0357  07BC		     _Year	     dw	     1980	     ; 37 - year
+    525	0359  00				     db	     0		     ; 39 - unknown
+    526						     public  _CharReqHdr
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 13
+kernel.ASM
+
+
+
+    527	035A			     _CharReqHdr     label   byte
+    528						     public  _ClkReqHdr
+    529	035A  1E*(??)		     _ClkReqHdr	     db	     30	dup (?)	     ; 3A - Device driver request header
+    530	0378  00000000				     dd	     0		     ; 58 - pointer to driver entry
+    531						     public  _MediaReqHdr
+    532	037C  16*(??)		     _MediaReqHdr    db	     22	dup (?)	     ; 5C - Device driver request header
+    533						     public  _IoReqHdr
+    534	0392  1E*(??)		     _IoReqHdr	     db	     30	dup (?)	     ; 72 - Device driver request header
+    535	03B0  06*(??)				     db	     6 dup (?)	     ; 90 - unknown
+    536						     public  _ClkRecord
+    537	03B6  06*(??)		     _ClkRecord	     db	     6 dup (?)	     ; 96 - CLOCK$ transfer record
+    538	03BC  0000				     dw	     (?)	     ; 9C - unknown
+    539						     public  __PriPathBuffer
+    540	03BE  80*(??)		     __PriPathBuffer db	     80h dup (?)     ; 9E - buffer for file name
+    541						     public  __SecPathBuffer
+    542	043E  80*(??)		     __SecPathBuffer db	     80h dup (?)     ;11E - buffer for file name
+    543						     public  _TempBuffer
+    544	04BE  15*(??)		     _TempBuffer     db	     21	dup (?)	     ;19E - 21 byte srch state
+    545						     public  _SearchDir
+    546	04D3  20*(??)		     _SearchDir	     db	     32	dup (?)	     ;1B3 - 32 byte dir	entry
+    547						     public  _TempCDS
+    548	04F3  58*(??)		     _TempCDS	     db	     88	dup (?)	     ;1D3 - TemporaryCDS buffer
+    549						     public  _DirEntBuffer
+    550	054B  20*(??)		     _DirEntBuffer   db	     32	dup (?)	     ;22B - space enough for 1 dir entry
+    551						     public  _wAttr
+    552	056B  0000		     _wAttr	     dw	     0		     ;24B - extended FCB file attribute
+    553
+    554
+    555						     ; Pad to 0570h
+    556	056D  03*(??)				     db	     (250h - (offset $ - _internal_data)) dup (?)
+    557						     public  _lpUserStack
+    558	0570  00000000		     _lpUserStack    dd	     (?)	     ;250 - pointer to user stack frame
+    559
+    560						     ; Pad to 057Ch
+    561	0574  08*(??)				     db	     (25ch - (offset $ - _internal_data)) dup (?)
+    562
+    563						     public  _tsr	     ; used by break and critical error
+    564	057C  00		     _tsr	     db	     0		     ;25C -  handlers during termination
+    565	057D  00				     db	     (?)	     ;25D - padding
+    566						     public  term_psp
+    567	057E  0000		     term_psp	     dw	 0		     ;25E - ???
+    568						     public  int24_esbp
+    569	0580  02*(????)		     int24_esbp	     dw	     2 dup (?)	     ;260 - pointer to criticalerr DPB
+    570						     public  _user_r, int21regs_off, int21regs_seg
+    571	0584			     _user_r	     label   dword
+    572	0584  0000		     int21regs_off   dw	     0		     ;264 - pointer to int21h stack frame
+    573	0586  0000		     int21regs_seg   dw	     0
+    574						     public  critical_sp
+    575	0588  0000		     critical_sp     dw	     0		     ;268 - critical error internal stack
+    576						     public  current_ddsc
+    577	058A  02*(????)		     current_ddsc    dw	     2 dup (?)
+    578
+    579						     ; Pad to 059ah
+    580	058E  0C*(??)				     db	     (27ah - (offset $ - _internal_data)) dup (?)
+    581						     public  current_device
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 14
+kernel.ASM
+
+
+
+    582	059A  02*(????)		     current_device  dw	     2 dup (?)	     ;27A - ???
+    583						     public  _lpCurSft
+    584	059E  02*(????)		     _lpCurSft	     dw	     2 dup (?)	     ;27e - Current SFT
+    585						     public  current_ldt
+    586	05A2  02*(????)		     current_ldt     dw	     2 dup (?)	     ;282 - Current CDS
+    587						     public  _lpFcb
+    588	05A6  02*(????)		     _lpFcb	     dw	     2 dup (?)	     ;286 - pointer to callers FCB
+    589						     public  current_ifn
+    590	05AA  0000		     current_ifn     dw	     0		     ;28A - SFT	index for next open
+    591
+    592						     ; Pad to 05ceh
+    593	05AC  22*(??)				     db	     (2aeh - (offset $ - _internal_data)) dup (?)
+    594						     public  current_filepos
+    595	05CE  02*(????)		     current_filepos dw	     2 dup (?)	     ;2AE - current offset in file
+    596
+    597						     ; Pad to 05f0h
+    598	05D2  1E*(??)				     db	     (2d0h - (offset $ - _internal_data)) dup (?)
+    599						     public  _prev_user_r
+    600						     public  prev_int21regs_off
+    601						     public  prev_int21regs_seg
+    602	05F0			     _prev_user_r    label   dword
+    603	05F0  0000		     prev_int21regs_off	     dw	     0	     ;2D0 - pointer to prev int	21 frame
+    604	05F2  0000		     prev_int21regs_seg	     dw	     0
+    605
+    606						     ; Pad to 0620h
+    607	05F4  2C*(??)				     db	     (300h - (offset $ - _internal_data)) dup (?)
+    608
+    609						     public  _FcbSearchBuffer	     ; during FCB search 1st/next use bottom
+    610	0620			     _FcbSearchBuffer	     label byte		     ;	of error stack as scratch buffer
+    611				     ;		     db	     43	dup (?)		     ;	- only used during int 21 call
+    612						     public  _LocalPath
+    613	0620			     _LocalPath	     label   byte
+    614				     ;		     db	     67	dup (?)
+    615						     ; stacks are made to initialize to	no-ops so that high-water
+    616						     ; tesing can be performed
+    617	0620			     apistk_bottom   label   word
+    618	0620  C0*(????)				     dw	     STACK_SIZE	dup (?)	     ;300 - Error Processing Stack
+    619						     public  _error_tos
+    620	07A0			     _error_tos	     label   word
+    621	07A0  C0*(????)				     dw	     STACK_SIZE	dup (?)	     ;480 - Disk Function Stack
+    622						     public  _disk_api_tos
+    623	0920			     _disk_api_tos   label   word
+    624	0920  C0*(????)				     dw	     STACK_SIZE	dup (?)	     ;600 - Char Function Stack
+    625						     public  _char_api_tos
+    626	0AA0			     _char_api_tos   label   word
+    627	0AA0			     apistk_top	     label   word
+    628
+    629	0AA0  00		     _VolChange	     db	     0		     ;781 - volume change
+    630	0AA1  00		     _VirtOpen	     db	     0		     ;782 - virtual open flag
+    631
+    632						     ; controlled variables end	at offset 78Ch so pad to end
+    633	0AA2  0A*(??)				     db	     (78ch - (offset $ - _internal_data)) dup (?)
+    634	0AAC			     _swap_indos     label   byte
+    635				     ;
+    636				     ; end of controlled variables
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 15
+kernel.ASM
+
+
+
+    637				     ;
+    638	0AAC			     _FIXED_DATA     ends
+    639
+    640	0000			     _BSS	     segment word public 'BSS'
+    641						     public  _NumFloppies
+    642	0000  0000		     _NumFloppies    dw	     (?)
+    643	0002  0000		     intr_dos_stk    dw	     (?)
+    644	0004  0000		     intr_dos_seg    dw	     (?)
+    645
+    646
+    647						     public  _api_sp
+    648	0006  0000		     _api_sp	     dw	     (?)	     ; api stacks - for	context
+    649						     public  _api_ss
+    650	0008  0000		     _api_ss	     dw	     (?)	     ; switching
+    651						     public  _usr_sp
+    652	000A  0000		     _usr_sp	     dw	     (?)	     ; user stacks
+    653						     public  _usr_ss
+    654	000C  0000		     _usr_ss	     dw	     (?)
+    655						     public  _ram_top
+    656	000E  0000		     _ram_top	     dw	     (?)
+    657
+    658	0010			     _BSS	     ends
+    659
+    660
+    661
+    662	0000			     _BSSEND	     segment byte public 'STACK'
+    663				     ; blockdev	private	stack
+    664						     public  blk_stk_top
+    665	0000  0100*(????)			     dw	     256 dup (?)
+    666	0200			     blk_stk_top     label   byte
+    667
+    668				     ; clockdev	private	stack
+    669						     public  clk_stk_top
+    670	0200  0100*(????)			     dw	     256 dup (?)
+    671	0400			     clk_stk_top     label   byte
+    672
+    673				     ; interrupt stack
+    674	0400  0100*(????)			     dw	     256 dup (?)
+    675	0600			     intr_stk_top    label   byte
+    676
+    677				     ; int 21 api stack	area
+    678						     public  stack_bottom
+    679	0600			     stack_bottom    label   word
+    680	0600  0200				     dw	     512
+    681	0602			     tos	     label   byte
+    682
+    683						     public  last
+    684	0602			     last	     label   word		     ; must always be end of stack area
+    685						     public  _last
+    686	0602			     _last	     label   byte		     ; and c version
+    687
+    688	0602			     _BSSEND	     ends
+    689
+    690
+    691						     end     entry
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 16
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "12/06/98"
+??FILENAME			  Text	 "kernel  "
+??TIME				  Text	 "09:46:42"
+??VERSION			  Number 030A
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _BSSEND
+@FILENAME			  Text	 KERNEL
+@WORDSIZE			  Text	 2
+APISTK_BOTTOM			  Word	 _FIXED_DATA:0620
+APISTK_TOP			  Word	 _FIXED_DATA:0AA0
+BLK_STK_TOP (blk_stk_top)	  Byte	 _BSSEND:0200
+BREAK_SP			  Word	 _FIXED_DATA:0332
+BUF_INFO			  Dword	 _FIXED_DATA:006E
+CLK_STK_TOP (clk_stk_top)	  Byte	 _BSSEND:0400
+CRITICAL_SP (critical_sp)	  Word	 _FIXED_DATA:0588
+CURRENT_DDSC (current_ddsc)	  Word	 _FIXED_DATA:058A
+CURRENT_DEVICE (current_device)	  Word	 _FIXED_DATA:059A
+CURRENT_FILEPOS		       +  Word	 _FIXED_DATA:05CE
+(current_filepos)
+CURRENT_IFN (current_ifn)	  Word	 _FIXED_DATA:05AA
+CURRENT_LDT (current_ldt)	  Word	 _FIXED_DATA:05A2
+DATASTART (DATASTART)		  Byte	 _FIXED_DATA:0000
+DAYSSINCE1980			  Word	 _FIXED_DATA:0354
+DEBLOCK_SEG			  Word	 _FIXED_DATA:007D
+DMD_UPPER_LINK			  Byte	 _FIXED_DATA:008A
+DMD_UPPER_ROOT			  Word	 _FIXED_DATA:008D
+DOS_DATA			  Byte	 _FIXED_DATA:0000
+ENTRY				  Near	 _TEXT:0000
+INT21REGS_OFF (int21regs_off)	  Word	 _FIXED_DATA:0584
+INT21REGS_SEG (int21regs_seg)	  Word	 _FIXED_DATA:0586
+INT24_ESBP (int24_esbp)		  Word	 _FIXED_DATA:0580
+INTR_DOS_SEG			  Word	 _BSS:0004
+INTR_DOS_STK			  Word	 _BSS:0002
+INTR_STK_TOP			  Byte	 _BSSEND:0600
+KERNEL_START			  Near	 _TEXT:000B
+LAST (last)			  Word	 _BSSEND:0602
+MARK0026H (MARK0026H)		  Number _FIXED_DATA:0026
+MARK01FBH (MARK01FBH)		  Number _FIXED_DATA:01FB
+NET_NAME (net_name)		  Byte	 _FIXED_DATA:0305
+NET_SET_COUNT (net_set_count)	  Byte	 _FIXED_DATA:0304
+OWNING_PSP (owning_psp)		  Word	 _FIXED_DATA:033C
+PREV_INT21REGS_OFF	       +  Word	 _FIXED_DATA:05F0
+(prev_int21regs_off)
+PREV_INT21REGS_SEG	       +  Word	 _FIXED_DATA:05F2
+(prev_int21regs_seg)
+SETVERPTR			  Word	 _FIXED_DATA:005D
+SHARING_FLAG (sharing_flag)	  Byte	 _FIXED_DATA:0303
+STACK_BOTTOM (stack_bottom)	  Word	 _BSSEND:0600
+STACK_SIZE			  Number 00C0
+STANDALONE			  Text	 1
+SYSVAREND			  Byte	 _FIXED_DATA:0091
+TERM_PSP (term_psp)		  Word	 _FIXED_DATA:057E
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 17
+Symbol Table
+
+
+
+TOS				  Byte	 _BSSEND:0602
+_API_SP	(_api_sp)		  Word	 _BSS:0006
+_API_SS	(_api_ss)		  Word	 _BSS:0008
+_BOOTDRIVE (_BootDrive)		  Word	 _FIXED_DATA:0069
+_BREAK_ENA (_break_ena)		  Byte	 _FIXED_DATA:0337
+_BREAK_FLG (_break_flg)		  Byte	 _FIXED_DATA:034D
+_BREAK_HANDLER (_break_handler)	  Near	 _TEXT:---- Extern
+_BREAK_KEY (_break_key)		  Far	 _TEXT:006B
+_CDSP (_CDSp)			  Dword	 _FIXED_DATA:003C
+_CHARREQHDR (_CharReqHdr)	  Byte	 _FIXED_DATA:035A
+_CHAR_API_TOS (_char_api_tos)	  Word	 _FIXED_DATA:0AA0
+_CLKRECORD (_ClkRecord)		  Byte	 _FIXED_DATA:03B6
+_CLKREQHDR (_ClkReqHdr)		  Byte	 _FIXED_DATA:035A
+_CLOCK (_clock)			  Dword	 _FIXED_DATA:002E
+_CON_DRIVER (_con_driver)	  Near	 _TEXT:---- Extern
+_CRITERRACTION (_CritErrAction)	  Byte	 _FIXED_DATA:0326
+_CRITERRCLASS (_CritErrClass)	  Byte	 _FIXED_DATA:0327
+_CRITERRCODE (_CritErrCode)	  Word	 _FIXED_DATA:0324
+_CRITERRDEV (_CritErrDev)	  Dword	 _FIXED_DATA:0328
+_CRITERRDRIVE (_CritErrDrive)	  Byte	 _FIXED_DATA:0322
+_CRITERRLOCUS (_CritErrLocus)	  Byte	 _FIXED_DATA:0323
+_CRITPATCH (_CritPatch)		  Word	 _FIXED_DATA:0315
+_CU_PSP	(_cu_psp)		  Word	 _FIXED_DATA:0330
+_DAYOFMONTH (_DayOfMonth)	  Byte	 _FIXED_DATA:0350
+_DAYOFWEEK (_DayOfWeek)		  Byte	 _FIXED_DATA:0356
+_DEFAULT_DRIVE (_default_drive)	  Byte	 _FIXED_DATA:0336
+_DIRENTBUFFER (_DirEntBuffer)	  Byte	 _FIXED_DATA:054B
+_DISK_API_TOS (_disk_api_tos)	  Word	 _FIXED_DATA:0920
+_DPBP (_DPBp)			  Dword	 _FIXED_DATA:0026
+_DSKBUFFER (_DskBuffer)		  Dword	 _FIXED_DATA:001E
+_DTA (_dta)			  Dword	 _FIXED_DATA:032C
+_ERRORMODE (_ErrorMode)		  Byte	 _FIXED_DATA:0320
+_ERROR_TOS (_error_tos)		  Word	 _FIXED_DATA:07A0
+_EXIT (_exit)			  Near	 _TEXT:004C
+_FCBP (_FCBp)			  Dword	 _FIXED_DATA:0040
+_FCBSEARCHBUFFER	       +  Byte	 _FIXED_DATA:0620
+(_FcbSearchBuffer)
+_FIRSTBUF (_firstbuf)		  Dword	 _FIXED_DATA:0038
+_FIRST_MCB (_first_mcb)		  Word	 _FIXED_DATA:0024
+_INDOS (_InDOS)			  Byte	 _FIXED_DATA:0321
+_INT21AX (_Int21AX)		  Word	 _FIXED_DATA:033A
+_INTERNAL_DATA (_internal_data)	  Byte	 _FIXED_DATA:0320
+_IOREQHDR (_IoReqHdr)		  Byte	 _FIXED_DATA:0392
+_KB_BUF	(_kb_buf)		  Byte	 _FIXED_DATA:027B
+_LAST (_last)			  Byte	 _BSSEND:0602
+_LASTDRIVE (_lastdrive)		  Byte	 _FIXED_DATA:0047
+_LOCALPATH (_LocalPath)		  Byte	 _FIXED_DATA:0620
+_LPCURSFT (_lpCurSft)		  Word	 _FIXED_DATA:059E
+_LPFCB (_lpFcb)			  Word	 _FIXED_DATA:05A6
+_LPUSERSTACK (_lpUserStack)	  Dword	 _FIXED_DATA:0570
+_MACHINEID (_MachineId)		  Word	 _FIXED_DATA:033E
+_MAIN (_main)			  Near	 _TEXT:---- Extern
+_MAXBKSIZE (_maxbksize)		  Word	 _FIXED_DATA:0036
+_MEDIAREQHDR (_MediaReqHdr)	  Byte	 _FIXED_DATA:037C
+_MEM_ACCESS_MODE	       +  Byte	 _FIXED_DATA:0302
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 18
+Symbol Table
+
+
+
+(_mem_access_mode)
+_MONTH (_Month)			  Byte	 _FIXED_DATA:0351
+_NBLKDEV (_nblkdev)		  Byte	 _FIXED_DATA:0046
+_NETDELAY (_NetDelay)		  Word	 _FIXED_DATA:001C
+_NETRETRY (_NetRetry)		  Word	 _FIXED_DATA:001A
+_NJOINED (_njoined)		  Byte	 _FIXED_DATA:005A
+_NPROTFCB (_nprotfcb)		  Word	 _FIXED_DATA:0044
+_NUL_DEV (_nul_dev)		  Dword	 _FIXED_DATA:0048
+_NUL_INTR (_nul_intr)		  Far	 _TEXT:005B
+_NUL_STRTGY (_nul_strtgy)	  Far	 _TEXT:0050
+_NUMFLOPPIES (_NumFloppies)	  Word	 _BSS:0000
+_OSDATA				  Word	 _TEXT:0007
+_OSTEXT				  Word	 _TEXT:0005
+_OSVERSION			  Word	 _TEXT:0009
+_PREV_USER_R (_prev_user_r)	  Dword	 _FIXED_DATA:05F0
+_PRINTERECHO (_PrinterEcho)	  Byte	 _FIXED_DATA:02FE
+_RAM_TOP (_ram_top)		  Word	 _BSS:000E
+_REINIT_K (_reinit_k)		  Near	 _TEXT:---- Extern
+_REQPKTPTR (_ReqPktPtr)		  Dword	 _TEXT:---- Extern
+_RETURN_CODE (_return_code)	  Byte	 _FIXED_DATA:0334
+_RETURN_MODE (_return_mode)	  Byte	 _FIXED_DATA:0335
+_SCR_POS (_scr_pos)		  Byte	 _FIXED_DATA:0300
+_SEARCHDIR (_SearchDir)		  Byte	 _FIXED_DATA:04D3
+_SFTHEAD (_sfthead)		  Dword	 _FIXED_DATA:002A
+_SWAP_ALWAYS (_swap_always)	  Byte	 _FIXED_DATA:033A
+_SWAP_INDOS (_swap_indos)	  Byte	 _FIXED_DATA:0AAC
+_SWITCHAR (_switchar)		  Byte	 _FIXED_DATA:0301
+_SYSCON	(_syscon)		  Dword	 _FIXED_DATA:0032
+_TEMPBUFFER (_TempBuffer)	  Byte	 _FIXED_DATA:04BE
+_TEMPCDS (_TempCDS)		  Byte	 _FIXED_DATA:04F3
+_TSR (_tsr)			  Byte	 _FIXED_DATA:057C
+_USER_R	(_user_r)		  Dword	 _FIXED_DATA:0584
+_USR_SP	(_usr_sp)		  Word	 _BSS:000A
+_USR_SS	(_usr_ss)		  Word	 _BSS:000C
+_VERIFY_ENA (_verify_ena)	  Byte	 _FIXED_DATA:02FF
+_VIRTOPEN			  Byte	 _FIXED_DATA:0AA1
+_VOLCHANGE			  Byte	 _FIXED_DATA:0AA0
+_WATTR (_wAttr)			  Word	 _FIXED_DATA:056B
+_YEAR (_Year)			  Word	 _FIXED_DATA:0357
+_YEARSSINCE1980		       +  Word	 _FIXED_DATA:0352
+(_YearsSince1980)
+__PRIPATHBUFFER		       +  Byte	 _FIXED_DATA:03BE
+(__PriPathBuffer)
+__SECPATHBUFFER		       +  Byte	 _FIXED_DATA:043E
+(__SecPathBuffer)
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _BSS				  16  0010 Word	  Public  BSS
+  _BSSEND			  16  0602 Byte	  Public  STACK
+  _DATA				  16  0000 Word	  Public  DATA
+  _FIXED_DATA			  16  0AAC Para	  Public  DATA
+TGROUP				  Group
+  _IO_FIXED_DATA		  16  0000 Word	  Public  CODE
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 19
+Symbol Table
+
+
+
+  _IO_TEXT			  16  0000 Byte	  Public  CODE
+  _TEXT				  16  00A9 Byte	  Public  CODE
+

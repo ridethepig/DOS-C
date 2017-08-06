@@ -1,0 +1,374 @@
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 1
+printer.ASM
+
+
+
+      1				     ;
+      2				     ; File:
+      3				     ;				printer.asm
+      4				     ; Description:
+      5				     ;			    Printer device driver
+      6				     ;
+      7				     ;			     Copyright (c) 1998
+      8				     ;			     Pasquale J. Villani
+      9				     ;			     All Rights	Reserved
+     10				     ;
+     11				     ; This file is part of DOS-C.
+     12				     ;
+     13				     ; DOS-C is	free software; you can redistribute it and/or
+     14				     ; modify it under the terms of the	GNU General public License
+     15				     ; as published by the Free	Software Foundation; either version
+     16				     ; 2, or (at your option) any later	version.
+     17				     ;
+     18				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+     19				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+     20				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+     21				     ; the GNU General public License for more details.
+     22				     ;
+     23				     ; You should have received	a copy of the GNU General public
+     24				     ; License along with DOS-C; see the file COPYING.	If not,
+     25				     ; write to	the Free Software Foundation, 675 Mass Ave,
+     26				     ; Cambridge, MA 02139, USA.
+     27				     ;
+     28				     ; $Header$
+     29				     ;
+     30				     ; $Log$
+     31				     ; $EndLog$
+     32				     ;
+     33
+     34						     include io.inc
+1    35				     ;
+1    36				     ; File:
+1    37				     ;				  io.inc
+1    38				     ; Description:
+1    39				     ;	   Segments and	external common	routines used by various device	drivers
+1    40				     ;
+1    41				     ;			     Copyright (c) 1998
+1    42				     ;			     Pasquale J. Villani
+1    43				     ;			     All Rights	Reserved
+1    44				     ;
+1    45				     ; This file is part of DOS-C.
+1    46				     ;
+1    47				     ; DOS-C is	free software; you can redistribute it and/or
+1    48				     ; modify it under the terms of the	GNU General Public License
+1    49				     ; as published by the Free	Software Foundation; either version
+1    50				     ; 2, or (at your option) any later	version.
+1    51				     ;
+1    52				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+1    53				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+1    54				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+1    55				     ; the GNU General Public License for more details.
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 2
+printer.ASM
+
+
+
+1    56				     ;
+1    57				     ; You should have received	a copy of the GNU General Public
+1    58				     ; License along with DOS-C; see the file COPYING.	If not,
+1    59				     ; write to	the Free Software Foundation, 675 Mass Ave,
+1    60				     ; Cambridge, MA 02139, USA.
+1    61				     ;
+1    62				     ; $Logfile:   C:/usr/patv/dos-c/src/kernel/io.inv	$
+1    63				     ;
+1    64				     ; $Header:	  C:/usr/patv/dos-c/src/kernel/io.inv	1.0   06 Dec 1998  8:13:02   patv  $
+1    65				     ;
+1    66				     ; $Log:   C:/usr/patv/dos-c/src/kernel/io.inv  $
+1    67				     ;
+1    68				     ;	  Rev 1.0   06 Dec 1998	 8:13:02   patv
+1    69				     ; Initial revision.
+1    70				     ; $EndLog$
+1    71				     ;
+1    72
+1    73	0000			     _TEXT	     segment byte public 'CODE'
+1    74				     TGROUP	     group   _TEXT,_IO_TEXT,_IO_FIXED_DATA
+1    75				     DGROUP	     group   _FIXED_DATA,_DATA,_BSS,_BSSEND  ; small model
+1    76						     assume  cs:TGROUP,ds:DGROUP,ss:DGROUP
+1    77	0000			     _TEXT	     ends
+1    78
+1    79	0000			     _IO_TEXT	     segment byte public 'CODE'
+1    80	0000			     _IO_TEXT	     ends
+1    81
+1    82	0000			     _IO_FIXED_DATA  segment word public 'CODE'
+1    83	0000			     _IO_FIXED_DATA  ends
+1    84
+1    85	0000			     _FIXED_DATA     segment para public 'DATA'
+1    86	0000			     _FIXED_DATA     ends
+1    87
+1    88	0000			     _DATA	     segment word public 'DATA'
+1    89	0000			     _DATA	     ends
+1    90
+1    91	0000			     _BSS	     segment word public 'BSS'
+1    92	0000			     _BSS	     ends
+1    93
+1    94	0000			     _BSSEND	     segment byte public 'STACK'
+1    95	0000			     _BSSEND	     ends
+1    96
+1    97
+1    98						     extrn   _IOExit:near
+1    99						     extrn   _IOSuccess:near
+1   100						     extrn   _IOErrorExit:near
+1   101						     extrn   _IOErrCnt:near
+1   102						     extrn   _IODone:near
+1   103						     extrn   _IOCommandError:near
+1   104						     extrn   GetUnitNum:near
+1   105						     extrn   _ReqPktPtr:dword
+1   106
+    107
+    108	0000			     _IO_FIXED_DATA  segment word public 'CODE'
+    109						     assume cs:TGROUP
+    110
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 3
+printer.ASM
+
+
+
+    111						     public  LptTable
+    112	0000  18		     LptTable	     db	     18h
+    113	0001  0000e				     dw	     offset _IOExit
+    114	0003  0000e				     dw	     offset _IOExit
+    115	0005  0000e				     dw	     offset _IOExit
+    116	0007  0000e				     dw	     offset _IOCommandError
+    117	0009  0000e				     dw	     offset _IOSuccess
+    118	000B  0000e				     dw	     offset _IODone
+    119	000D  0000e				     dw	     offset _IOExit
+    120	000F  0000e				     dw	     offset _IOExit
+    121	0011  0000r				     dw	     offset PrtWrite
+    122	0013  0000r				     dw	     offset PrtWrite
+    123	0015  001Cr				     dw	     offset PrtOutStat
+    124	0017  0000e				     dw	     offset _IOExit
+    125	0019  0000e				     dw	     offset _IOExit
+    126	001B  0000e				     dw	     offset _IOExit
+    127	001D  0000e				     dw	     offset _IOExit
+    128	001F  0000e				     dw	     offset _IOExit
+    129	0021  004Cr				     dw	     offset PrtOutBsy
+    130	0023  0000e				     dw	     offset _IOExit
+    131	0025  0000e				     dw	     offset _IOExit
+    132	0027  0092r				     dw	     offset PrtGenIoctl
+    133	0029  0000e				     dw	     offset _IOExit
+    134	002B  0000e				     dw	     offset _IOExit
+    135	002D  0000e				     dw	     offset _IOExit
+    136	002F  0000e				     dw	     offset _IOCommandError
+    137	0031  0000e				     dw	     offset _IOCommandError
+    138	0033			     _IO_FIXED_DATA  ends
+    139
+    140
+    141	0000			     _DATA	     segment word public 'DATA'
+    142						     public  uPrtNo
+    143	0000  00		     uPrtNo	     db	     0
+    144	0001  0050		     uPrtQuantum     dw	     50h
+    145	0003  0050 0050				     dw	     50h, 50h
+    146	0007  50 00				     db	     50h, 00h
+    147	0009			     _DATA	     ends
+    148
+    149
+    150	0000			     _IO_TEXT	     segment byte public 'CODE'
+    151						     assume cs:TGROUP
+    152
+    153	0000			     PrtWrite	     proc    far
+    154	0000  E3 10				     jcxz    PrtWr3		     ; Exit if nothing to write
+    155	0002			     PrtWr1:
+    156	0002  BB 0002				     mov     bx,2
+    157	0005			     PrtWr2:
+    158	0005  26: 8A 05				     mov     al,es:[di]
+    159	0008  47				     inc     di
+    160	0009  32 E4				     xor     ah,ah		     ; Zero register
+    161	000B  E8 0024				     call    PrtIOCall		     ; (0800)
+    162	000E  75 05				     jnz     PrtWr4		     ; Exit if done
+    163	0010  E2 F0				     loop    PrtWr1		     ; otherwise loop
+    164	0012			     PrtWr3:
+    165	0012  E9 0000e				     jmp     _IOExit
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 4
+printer.ASM
+
+
+
+    166	0015			     PrtWr4:
+    167	0015  4F				     dec     di
+    168	0016  4B				     dec     bx
+    169	0017  75 EC				     jnz     PrtWr2
+    170	0019			     PrtWr5:
+    171	0019  E9 0000e				     jmp     _IOErrCnt
+    172	001C			     PrtWrite	     endp
+    173
+    174
+    175
+    176	001C			     PrtOutStat	     proc    far
+    177	001C  E8 0011				     call    GetPrtStat
+    178	001F  75 F8				     jnz     PrtWr5
+    179	0021  B0 09				     mov     al,9
+    180	0023  F6 C4 20				     test    ah,20h
+    181	0026  75 F1				     jnz     PrtWr5
+    182	0028  F6 C4 80				     test    ah,80h
+    183	002B  75 E5				     jnz     PrtWr3
+    184	002D  E9 0000e				     jmp     _IODone
+    185	0030			     PrtOutStat	     endp
+    186
+    187
+    188
+    189	0030			     GetPrtStat	     proc    near
+    190	0030  B4 02				     mov     ah,2
+    191
+    192	0032			     PrtIOCall:
+    193	0032  E8 0000e				     call    GetUnitNum
+    194	0035  CD 17				     int     17h		     ; print char al, get status ah
+    195	0037  F6 C4 08				     test    ah,8
+    196	003A  74 0A				     jz	     PrtIOCal2
+    197	003C  B0 09				     mov     al,9
+    198	003E  F6 C4 20				     test    ah,20h
+    199	0041  75 02				     jnz     PrtIOCal1
+    200	0043  FE C0				     inc     al
+    201	0045			     PrtIOCal1:
+    202	0045  C3				     retn
+    203	0046			     PrtIOCal2:
+    204	0046  B0 02				     mov     al,2
+    205	0048  F6 C4 01				     test    ah,1
+    206	004B  C3				     retn
+    207	004C			     GetPrtStat	     endp
+    208
+    209
+    210
+    211	004C			     PrtOutBsy	     proc    far
+    212	004C  1E				     push    ds
+    213	004D  06				     push    es
+    214	004E  1F				     pop     ds
+    215	004F  8B F7				     mov     si,di
+    216	0051			     PrtOtBsy1:
+    217	0051  51				     push    cx
+    218	0052  53				     push    bx
+    219	0053  33 DB				     xor     bx,bx
+    220	0055  2E: 8A 1E	0000r			     mov     bl,cs:uPrtNo
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 5
+printer.ASM
+
+
+
+    221	005A  D1 E3				     shl     bx,1
+    222	005C  2E: 8B 8F	0001r			     mov     cx,cs:uPrtQuantum[bx]
+    223	0061  5B				     pop     bx
+    224	0062			     PrtOtBsy2:
+    225	0062  E8 FFCB				     call    GetPrtStat
+    226	0065  75 1E				     jnz     PrtOtBsy3
+    227	0067  F6 C4 80				     test    ah,80h
+    228	006A  E1 F6				     loopz   PrtOtBsy2
+    229	006C  59				     pop     cx
+    230	006D  74 17				     jz	     PrtOtBsy4
+    231	006F  AC				     lodsb
+    232	0070  32 E4				     xor     ah,ah
+    233	0072  E8 FFBD				     call    PrtIOCall
+    234	0075  75 0F				     jnz     PrtOtBsy4
+    235	0077  E2 D8				     loop    PrtOtBsy1
+    236	0079  1F				     pop     ds
+    237	007A  2E: C5 1E	0000e			     lds     bx,cs:_ReqPktPtr
+    238	007F  29 4F 12				     sub     [bx+12h],cx
+    239	0082  E9 0000e				     jmp     _IOExit
+    240	0085			     PrtOtBsy3:
+    241	0085  59				     pop     cx
+    242	0086			     PrtOtBsy4:
+    243	0086  1F				     pop     ds
+    244	0087  2E: C5 1E	0000e			     lds     bx,cs:_ReqPktPtr
+    245	008C  29 4F 12				     sub     [bx+12h],cx
+    246	008F  E9 0000e				     jmp     _IOErrorExit
+    247	0092			     PrtOutBsy	     endp
+    248
+    249
+    250
+    251	0092			     PrtGenIoctl     proc    far
+    252	0092  C4 3E 0000e			     les     di,_ReqPktPtr
+    253	0096  26: 80 7D	0D 05			     cmp     byte ptr es:[di+0Dh],5
+    254	009B  74 03				     je	     PrtGnIoctl2
+    255	009D			     PrtGnIoctl1:
+    256	009D  E9 0000e				     jmp     _IOCommandError
+    257	00A0			     PrtGnIoctl2:
+    258	00A0  26: 8A 45	0E			     mov     al,es:[di+0Eh]
+    259	00A4  26: C4 7D	13			     les     di,dword ptr es:[di+13h]
+    260	00A8  33 DB				     xor     bx,bx
+    261	00AA  8A 1E 0000r			     mov     bl,uPrtNo
+    262	00AE  D1 E3				     shl     bx,1
+    263	00B0  8B 8F 0001r			     mov     cx,uPrtQuantum[bx]
+    264	00B4  3C 65				     cmp     al,65h
+    265	00B6  74 07				     je	     PrtGnIoctl3
+    266	00B8  3C 45				     cmp     al,45h
+    267	00BA  75 E1				     jne     PrtGnIoctl1
+    268	00BC  26: 8B 0D				     mov     cx,es:[di]
+    269	00BF			     PrtGnIoctl3:
+    270	00BF  89 8F 0001r			     mov     uPrtQuantum[bx],cx
+    271	00C3  26: 89 0D				     mov     es:[di],cx
+    272	00C6  E9 0000e				     jmp     _IOExit
+    273	00C9			     PrtGenIoctl     endp
+    274
+    275	00C9			     _IO_TEXT	     ends
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 6
+printer.ASM
+
+
+
+    276
+    277						     end
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 7
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "12/06/98"
+??FILENAME			  Text	 "printer "
+??TIME				  Text	 "09:46:45"
+??VERSION			  Number 030A
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _IO_TEXT
+@FILENAME			  Text	 PRINTER
+@WORDSIZE			  Text	 2
+GETPRTSTAT			  Near	 _IO_TEXT:0030
+GETUNITNUM (GetUnitNum)		  Near	 ----:---- Extern
+LPTTABLE (LptTable)		  Byte	 _IO_FIXED_DATA:0000
+PRTGENIOCTL			  Far	 _IO_TEXT:0092
+PRTGNIOCTL1			  Near	 _IO_TEXT:009D
+PRTGNIOCTL2			  Near	 _IO_TEXT:00A0
+PRTGNIOCTL3			  Near	 _IO_TEXT:00BF
+PRTIOCAL1			  Near	 _IO_TEXT:0045
+PRTIOCAL2			  Near	 _IO_TEXT:0046
+PRTIOCALL			  Near	 _IO_TEXT:0032
+PRTOTBSY1			  Near	 _IO_TEXT:0051
+PRTOTBSY2			  Near	 _IO_TEXT:0062
+PRTOTBSY3			  Near	 _IO_TEXT:0085
+PRTOTBSY4			  Near	 _IO_TEXT:0086
+PRTOUTBSY			  Far	 _IO_TEXT:004C
+PRTOUTSTAT			  Far	 _IO_TEXT:001C
+PRTWR1				  Near	 _IO_TEXT:0002
+PRTWR2				  Near	 _IO_TEXT:0005
+PRTWR3				  Near	 _IO_TEXT:0012
+PRTWR4				  Near	 _IO_TEXT:0015
+PRTWR5				  Near	 _IO_TEXT:0019
+PRTWRITE			  Far	 _IO_TEXT:0000
+STANDALONE			  Text	 1
+UPRTNO (uPrtNo)			  Byte	 _DATA:0000
+UPRTQUANTUM			  Word	 _DATA:0001
+_IOCOMMANDERROR		       +  Near	 ----:---- Extern
+(_IOCommandError)
+_IODONE	(_IODone)		  Near	 ----:---- Extern
+_IOERRCNT (_IOErrCnt)		  Near	 ----:---- Extern
+_IOERROREXIT (_IOErrorExit)	  Near	 ----:---- Extern
+_IOEXIT	(_IOExit)		  Near	 ----:---- Extern
+_IOSUCCESS (_IOSuccess)		  Near	 ----:---- Extern
+_REQPKTPTR (_ReqPktPtr)		  Dword	 ----:---- Extern
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _BSS				  16  0000 Word	  Public  BSS
+  _BSSEND			  16  0000 Byte	  Public  STACK
+  _DATA				  16  0009 Word	  Public  DATA
+  _FIXED_DATA			  16  0000 Para	  Public  DATA
+TGROUP				  Group
+  _IO_FIXED_DATA		  16  0033 Word	  Public  CODE
+  _IO_TEXT			  16  00C9 Byte	  Public  CODE
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 8
+Symbol Table
+
+
+
+  _TEXT				  16  0000 Byte	  Public  CODE
+

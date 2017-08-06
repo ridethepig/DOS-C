@@ -1,0 +1,336 @@
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 1
+serial.ASM
+
+
+
+      1				     ;
+      2				     ; File:
+      3				     ;				serial.asm
+      4				     ; Description:
+      5				     ;			    Serial device driver
+      6				     ;
+      7				     ;			     Copyright (c) 1998
+      8				     ;			     Pasquale J. Villani
+      9				     ;			     All Rights	Reserved
+     10				     ;
+     11				     ; This file is part of DOS-C.
+     12				     ;
+     13				     ; DOS-C is	free software; you can redistribute it and/or
+     14				     ; modify it under the terms of the	GNU General public License
+     15				     ; as published by the Free	Software Foundation; either version
+     16				     ; 2, or (at your option) any later	version.
+     17				     ;
+     18				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+     19				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+     20				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+     21				     ; the GNU General public License for more details.
+     22				     ;
+     23				     ; You should have received	a copy of the GNU General public
+     24				     ; License along with DOS-C; see the file COPYING.	If not,
+     25				     ; write to	the Free Software Foundation, 675 Mass Ave,
+     26				     ; Cambridge, MA 02139, USA.
+     27				     ;
+     28				     ; $Header$
+     29				     ;
+     30				     ; $Log$
+     31				     ; $EndLog$
+     32				     ;
+     33
+     34						     include io.inc
+1    35				     ;
+1    36				     ; File:
+1    37				     ;				  io.inc
+1    38				     ; Description:
+1    39				     ;	   Segments and	external common	routines used by various device	drivers
+1    40				     ;
+1    41				     ;			     Copyright (c) 1998
+1    42				     ;			     Pasquale J. Villani
+1    43				     ;			     All Rights	Reserved
+1    44				     ;
+1    45				     ; This file is part of DOS-C.
+1    46				     ;
+1    47				     ; DOS-C is	free software; you can redistribute it and/or
+1    48				     ; modify it under the terms of the	GNU General Public License
+1    49				     ; as published by the Free	Software Foundation; either version
+1    50				     ; 2, or (at your option) any later	version.
+1    51				     ;
+1    52				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+1    53				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+1    54				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+1    55				     ; the GNU General Public License for more details.
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 2
+serial.ASM
+
+
+
+1    56				     ;
+1    57				     ; You should have received	a copy of the GNU General Public
+1    58				     ; License along with DOS-C; see the file COPYING.	If not,
+1    59				     ; write to	the Free Software Foundation, 675 Mass Ave,
+1    60				     ; Cambridge, MA 02139, USA.
+1    61				     ;
+1    62				     ; $Logfile:   C:/usr/patv/dos-c/src/kernel/io.inv	$
+1    63				     ;
+1    64				     ; $Header:	  C:/usr/patv/dos-c/src/kernel/io.inv	1.0   06 Dec 1998  8:13:02   patv  $
+1    65				     ;
+1    66				     ; $Log:   C:/usr/patv/dos-c/src/kernel/io.inv  $
+1    67				     ;
+1    68				     ;	  Rev 1.0   06 Dec 1998	 8:13:02   patv
+1    69				     ; Initial revision.
+1    70				     ; $EndLog$
+1    71				     ;
+1    72
+1    73	0000			     _TEXT	     segment byte public 'CODE'
+1    74				     TGROUP	     group   _TEXT,_IO_TEXT,_IO_FIXED_DATA
+1    75				     DGROUP	     group   _FIXED_DATA,_DATA,_BSS,_BSSEND  ; small model
+1    76						     assume  cs:TGROUP,ds:DGROUP,ss:DGROUP
+1    77	0000			     _TEXT	     ends
+1    78
+1    79	0000			     _IO_TEXT	     segment byte public 'CODE'
+1    80	0000			     _IO_TEXT	     ends
+1    81
+1    82	0000			     _IO_FIXED_DATA  segment word public 'CODE'
+1    83	0000			     _IO_FIXED_DATA  ends
+1    84
+1    85	0000			     _FIXED_DATA     segment para public 'DATA'
+1    86	0000			     _FIXED_DATA     ends
+1    87
+1    88	0000			     _DATA	     segment word public 'DATA'
+1    89	0000			     _DATA	     ends
+1    90
+1    91	0000			     _BSS	     segment word public 'BSS'
+1    92	0000			     _BSS	     ends
+1    93
+1    94	0000			     _BSSEND	     segment byte public 'STACK'
+1    95	0000			     _BSSEND	     ends
+1    96
+1    97
+1    98						     extrn   _IOExit:near
+1    99						     extrn   _IOSuccess:near
+1   100						     extrn   _IOErrorExit:near
+1   101						     extrn   _IOErrCnt:near
+1   102						     extrn   _IODone:near
+1   103						     extrn   _IOCommandError:near
+1   104						     extrn   GetUnitNum:near
+1   105						     extrn   _ReqPktPtr:dword
+1   106
+    107
+    108	0000			     _IO_FIXED_DATA  segment word public 'CODE'
+    109						     assume cs:TGROUP
+    110
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 3
+serial.ASM
+
+
+
+    111						     public  ComTable
+    112	0000  0A		     ComTable	     db	     0Ah
+    113	0001  0000e				     dw	     offset _IOExit
+    114	0003  0000e				     dw	     offset _IOExit
+    115	0005  0000e				     dw	     offset _IOExit
+    116	0007  0000e				     dw	     offset _IOCommandError
+    117	0009  0000r				     dw	     offset ComRead
+    118	000B  002Br				     dw	     offset ComNdRead
+    119	000D  0000e				     dw	     offset _IOExit
+    120	000F  0069r				     dw	     offset ComInpFlush
+    121	0011  0072r				     dw	     offset ComWrite
+    122	0013  0072r				     dw	     offset ComWrite
+    123	0015  004Er				     dw	     offset ComOutStat
+    124
+    125	0017			     _IO_FIXED_DATA  ends
+    126
+    127
+    128	0000			     _IO_TEXT	     segment byte public 'CODE'
+    129						     assume cs:TGROUP
+    130
+    131						     extrn   CommonNdRdExit:near
+    132
+    133	0000			     ComRead	     proc    far
+    134	0000  E3 11				     jcxz    ComRd3
+    135	0002  E8 0087				     call    GetComStat
+    136	0005  33 C0				     xor     ax,ax
+    137	0007  86 07				     xchg    [bx],al
+    138	0009  0A C0				     or	     al,al
+    139	000B  75 03				     jnz     ComRd2
+    140	000D			     ComRd1:
+    141	000D  E8 0006				     call    BiosRdCom
+    142	0010			     ComRd2:
+    143	0010  AA				     stosb
+    144	0011  E2 FA				     loop    ComRd1
+    145
+    146	0013			     ComRd3:
+    147	0013  E9 0000e				     jmp     _IOExit
+    148	0016			     ComRead	     endp
+    149
+    150
+    151	0016			     BiosRdCom	     proc    near
+    152	0016  B4 02				     mov     ah,2
+    153	0018  E8 0048				     call    ComIOCall
+    154	001B  F6 C4 0E				     test    ah,0Eh
+    155	001E  74 0A				     jz	     BiosRdRetn
+    156	0020  83 C4 02				     add     sp,2
+    157	0023  32 C0				     xor     al,al
+    158	0025  0C B0				     or	     al,0B0h
+    159	0027  E9 0000e				     jmp     _IOErrCnt
+    160	002A			     BiosRdRetn:
+    161	002A  C3				     retn
+    162	002B			     BiosRdCom	     endp
+    163
+    164
+    165
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 4
+serial.ASM
+
+
+
+    166	002B			     ComNdRead	     proc    far
+    167	002B  E8 005E				     call    GetComStat
+    168	002E  8A 07				     mov     al,[bx]
+    169	0030  0A C0				     or	     al,al
+    170	0032  75 14				     jnz     ComNdRd1
+    171	0034  E8 0026				     call    ComRdStatus
+    172	0037  F6 C4 01				     test    ah,1
+    173	003A  74 0F				     jz	     ComNdRtn
+    174	003C  A8 20				     test    al,20h
+    175	003E  74 0B				     jz	     ComNdRtn
+    176	0040  E8 FFD3				     call    BiosRdCom
+    177	0043  E8 0046				     call    GetComStat
+    178	0046  88 07				     mov     [bx],al
+    179	0048			     ComNdRd1:
+    180	0048  E9 0000e				     jmp     CommonNdRdExit
+    181	004B			     ComNdRtn:
+    182	004B  E9 0000e				     jmp     _IODone
+    183	004E			     ComNdRead	     endp
+    184
+    185
+    186	004E			     ComOutStat	     proc    far
+    187	004E  E8 000C				     call    ComRdStatus
+    188	0051  A8 20				     test    al,20h
+    189	0053  74 F6				     jz	     ComNdRtn
+    190	0055  F6 C4 20				     test    ah,20h
+    191	0058  74 F1				     jz	     ComNdRtn
+    192	005A  E9 0000e				     jmp     _IOExit
+    193	005D			     ComOutStat	     endp
+    194
+    195
+    196	005D			     ComRdStatus     proc    near
+    197	005D  B4 03				     mov     ah,3
+    198	005F  E8 0001				     call    ComIOCall
+    199	0062  C3				     retn
+    200	0063			     ComRdStatus     endp
+    201
+    202
+    203	0063			     ComIOCall	     proc    near
+    204	0063  E8 0000e				     call    GetUnitNum
+    205	0066  CD 14				     int     14h		     ; RS-232 get char al, ah=return status
+    206	0068  C3				     retn
+    207	0069			     ComIOCall	     endp
+    208
+    209
+    210	0069			     ComInpFlush     proc    far
+    211	0069  E8 0020				     call    GetComStat
+    212	006C  C6 07 00				     mov     byte ptr [bx],0
+    213	006F  E9 0000e				     jmp     _IOExit
+    214	0072			     ComInpFlush     endp
+    215
+    216
+    217	0072			     ComWrite	     proc    far
+    218	0072  E3 9F				     jcxz    ComRd3
+    219	0074			     ComWr1:
+    220	0074  26: 8A 05				     mov     al,es:[di]
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 5
+serial.ASM
+
+
+
+    221	0077  47				     inc     di
+    222	0078  B4 01				     mov     ah,1
+    223	007A  E8 FFE6				     call    ComIOCall
+    224	007D  F6 C4 80				     test    ah,80h
+    225	0080  74 05				     jz	     ComWr2
+    226	0082  B0 0A				     mov     al,0Ah
+    227	0084  E9 0000e				     jmp     _IOErrCnt
+    228	0087			     ComWr2:
+    229	0087  E2 EB				     loop    ComWr1
+    230	0089  E9 0000e				     jmp     _IOExit
+    231	008C			     ComWrite	     endp
+    232
+    233
+    234	008C			     GetComStat	     proc    near
+    235	008C  E8 0000e				     call    GetUnitNum
+    236	008F  8B DA				     mov     bx,dx
+    237	0091  81 C3 0000r			     add     bx,offset ComStatArray
+    238	0095  C3				     retn
+    239	0096			     GetComStat	     endp
+    240
+    241
+    242
+    243	0096			     _IO_TEXT	     ends
+    244
+    245	0000			     _DATA	     segment word public 'DATA'
+    246
+    247	0000  00 00 00 00	     ComStatArray    db	     0,	0, 0, 0
+    248
+    249	0004			     _DATA	     ends
+    250
+    251
+    252						     end
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 6
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "12/06/98"
+??FILENAME			  Text	 "serial  "
+??TIME				  Text	 "09:46:45"
+??VERSION			  Number 030A
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _DATA
+@FILENAME			  Text	 SERIAL
+@WORDSIZE			  Text	 2
+BIOSRDCOM			  Near	 _IO_TEXT:0016
+BIOSRDRETN			  Near	 _IO_TEXT:002A
+COMINPFLUSH			  Far	 _IO_TEXT:0069
+COMIOCALL			  Near	 _IO_TEXT:0063
+COMMONNDRDEXIT (CommonNdRdExit)	  Near	 _IO_TEXT:---- Extern
+COMNDRD1			  Near	 _IO_TEXT:0048
+COMNDREAD			  Far	 _IO_TEXT:002B
+COMNDRTN			  Near	 _IO_TEXT:004B
+COMOUTSTAT			  Far	 _IO_TEXT:004E
+COMRD1				  Near	 _IO_TEXT:000D
+COMRD2				  Near	 _IO_TEXT:0010
+COMRD3				  Near	 _IO_TEXT:0013
+COMRDSTATUS			  Near	 _IO_TEXT:005D
+COMREAD				  Far	 _IO_TEXT:0000
+COMSTATARRAY			  Byte	 _DATA:0000
+COMTABLE (ComTable)		  Byte	 _IO_FIXED_DATA:0000
+COMWR1				  Near	 _IO_TEXT:0074
+COMWR2				  Near	 _IO_TEXT:0087
+COMWRITE			  Far	 _IO_TEXT:0072
+GETCOMSTAT			  Near	 _IO_TEXT:008C
+GETUNITNUM (GetUnitNum)		  Near	 ----:---- Extern
+STANDALONE			  Text	 1
+_IOCOMMANDERROR		       +  Near	 ----:---- Extern
+(_IOCommandError)
+_IODONE	(_IODone)		  Near	 ----:---- Extern
+_IOERRCNT (_IOErrCnt)		  Near	 ----:---- Extern
+_IOERROREXIT (_IOErrorExit)	  Near	 ----:---- Extern
+_IOEXIT	(_IOExit)		  Near	 ----:---- Extern
+_IOSUCCESS (_IOSuccess)		  Near	 ----:---- Extern
+_REQPKTPTR (_ReqPktPtr)		  Dword	 ----:---- Extern
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _BSS				  16  0000 Word	  Public  BSS
+  _BSSEND			  16  0000 Byte	  Public  STACK
+  _DATA				  16  0004 Word	  Public  DATA
+  _FIXED_DATA			  16  0000 Para	  Public  DATA
+TGROUP				  Group
+  _IO_FIXED_DATA		  16  0017 Word	  Public  CODE
+  _IO_TEXT			  16  0096 Byte	  Public  CODE
+  _TEXT				  16  0000 Byte	  Public  CODE
+

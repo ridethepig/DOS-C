@@ -1,0 +1,944 @@
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 1
+entry.ASM
+
+
+
+      1				     ;
+      2				     ; File:
+      3				     ;				entry.asm
+      4				     ; Description:
+      5				     ;			    System call	entry code
+      6				     ;
+      7				     ;			     Copyright (c) 1998
+      8				     ;			     Pasquale J. Villani
+      9				     ;			     All Rights	Reserved
+     10				     ;
+     11				     ; This file is part of DOS-C.
+     12				     ;
+     13				     ; DOS-C is	free software; you can redistribute it and/or
+     14				     ; modify it under the terms of the	GNU General public License
+     15				     ; as published by the Free	Software Foundation; either version
+     16				     ; 2, or (at your option) any later	version.
+     17				     ;
+     18				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+     19				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+     20				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+     21				     ; the GNU General public License for more details.
+     22				     ;
+     23				     ; You should have received	a copy of the GNU General public
+     24				     ; License along with DOS-C; see the file COPYING.	If not,
+     25				     ; write to	the Free Software Foundation, 675 Mass Ave,
+     26				     ; Cambridge, MA 02139, USA.
+     27				     ;
+     28				     ; $Header:	  C:/usr/patv/dos-c/src/kernel/entry.asv   1.1	 06 Dec	1998  8:48:40	patv  $
+     29				     ;
+     30				     ; $Log:   C:/usr/patv/dos-c/src/kernel/entry.asv  $
+     31				     ;
+     32				     ;	   Rev 1.1   06	Dec 1998  8:48:40   patv
+     33				     ;	New int	21h handler code.
+     34				     ;
+     35				     ;	   Rev 1.0   07	Feb 1998 20:42:08   patv
+     36				     ;	Modified stack frame to	match DOS standard
+     37				     ; $EndLog$
+     38
+     39
+     40	0000			     _TEXT	     segment byte public 'CODE'
+     41				     DGROUP	     group   _FIXED_DATA,_DATA,_BSS,_BSSEND  ; small model
+     42						     assume  cs:_TEXT,ds:DGROUP,ss:DGROUP
+     43	0000			     _TEXT	     ends
+     44
+     45	0000			     _FIXED_DATA     segment para public 'DATA'
+     46	0000			     _FIXED_DATA     ends
+     47
+     48	0000			     _DATA	     segment word public 'DATA'
+     49	0000			     _DATA	     ends
+     50
+     51	0000			     _BSS	     segment word public 'BSS'
+     52	0000			     _BSS	     ends
+     53
+     54	0000			     _BSSEND	     segment byte public 'STACK'
+     55	0000			     _BSSEND	     ends
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 2
+entry.ASM
+
+
+
+     56
+     57
+     58						     include stacks.inc
+1    59				     ;
+1    60				     ; File:
+1    61				     ;			       stacks.inc
+1    62				     ; Description:
+1    63				     ;		     Macro support for register	stack frame
+1    64				     ;
+1    65				     ;			     Copyright (c) 1998
+1    66				     ;			     Pasquale J. Villani
+1    67				     ;			     All Rights	Reserved
+1    68				     ;
+1    69				     ; This file is part of DOS-C.
+1    70				     ;
+1    71				     ; DOS-C is	free software; you can redistribute it and/or
+1    72				     ; modify it under the terms of the	GNU General Public License
+1    73				     ; as published by the Free	Software Foundation; either version
+1    74				     ; 2, or (at your option) any later	version.
+1    75				     ;
+1    76				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+1    77				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+1    78				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+1    79				     ; the GNU General Public License for more details.
+1    80				     ;
+1    81				     ; You should have received	a copy of the GNU General Public
+1    82				     ; License along with DOS-C; see the file COPYING.	If not,
+1    83				     ; write to	the Free Software Foundation, 675 Mass Ave,
+1    84				     ; Cambridge, MA 02139, USA.
+1    85				     ;
+1    86				     ; $Logfile:   C:/dos-c/hdr/stacks.inv  $
+1    87				     ;
+1    88				     ; $Header:	  C:/dos-c/hdr/stacks.inv   1.0	  07 Feb 1998 20:59:16	 patv  $
+1    89				     ;
+1    90				     ; $Log:   C:/dos-c/hdr/stacks.inv	$
+1    91				     ;
+1    92				     ;	 Rev 1.0   07 Feb 1998 20:59:16	  patv
+1    93				     ;Modified stack frame to match DOS	standard
+1    94				     ; $EndLog$
+1    95
+1    96
+1    97				     ;
+1    98				     ; Standard	stack frame used throughout DOS-C
+1    99				     ;
+1   100				     ;	     MS-DOS specific
+1   101				     ;
+1   102				     ;	     +---------------+
+1   103				     ;	     |	  irp hi     |	     26
+1   104				     ;	     +---------------+
+1   105				     ;	     |	  irp low    |	     24
+1   106				     ;	     +---------------+
+1   107				     ;	     |	   flags     |	     22
+1   108				     ;	     +---------------+
+1   109				     ;	     |	     cs	     |	     20
+1   110				     ;	     +---------------+
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 3
+entry.ASM
+
+
+
+1   111				     ;	     |	     ip	     |	     18
+1   112				     ;	     +---------------+
+1   113				     ;	     |	     es	     |	     16
+1   114				     ;	     +---------------+
+1   115				     ;	     |	     ds	     |	     14
+1   116				     ;	     +---------------+
+1   117				     ;	     |	     bp	     |	     12
+1   118				     ;	     +---------------+
+1   119				     ;	     |	     di	     |	     10
+1   120				     ;	     +---------------+
+1   121				     ;	     |	     si	     |	     8
+1   122				     ;	     +---------------+
+1   123				     ;	     |	     dx	     |	     6
+1   124				     ;	     +---------------+
+1   125				     ;	     |	     cx	     |	     4
+1   126				     ;	     +---------------+
+1   127				     ;	     |	     bx	     |	     2
+1   128				     ;	     +---------------+
+1   129				     ;	     |	     ax	     |	     0
+1   130				     ;	     +---------------+
+1   131				     ;
+1   132
+1   133	*000			     RegFrame	     struc
+1   134	*000  01*(0000)				     reg_ax	     dw	(?)
+1   135	*002  01*(0000)				     reg_bx	     dw	(?)
+1   136	*004  01*(0000)				     reg_cx	     dw	(?)
+1   137	*006  01*(0000)				     reg_dx	     dw	(?)
+1   138	*008  01*(0000)				     reg_si	     dw	(?)
+1   139	*00A  01*(0000)				     reg_di	     dw	(?)
+1   140	*00C  01*(0000)				     reg_bp	     dw	(?)
+1   141	*00E  01*(0000)				     reg_ds	     dw	(?)
+1   142	*010  01*(0000)				     reg_es	     dw	(?)
+1   143	*012  01*(0000)				     reg_ip	     dw	(?)
+1   144	*014  01*(0000)				     reg_cs	     dw	(?)
+1   145	*016  01*(0000)				     reg_flags	     dw	(?)
+1   146	*018  01*(0000)				     irp_low	     dw	(?)
+1   147	*01A  01*(0000)				     irp_hi	     dw	(?)
+1   148	*01C					     ends
+1   149
+1   150
+1   151				     PUSH$ALL	     macro
+1   152						     push    es
+1   153						     push    ds
+1   154						     push    bp
+1   155						     push    di
+1   156						     push    si
+1   157						     push    dx
+1   158						     push    cx
+1   159						     push    bx
+1   160						     push    ax
+1   161						     endm
+1   162
+1   163				     POP$ALL	     macro
+1   164						     pop     ax
+1   165						     pop     bx
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 4
+entry.ASM
+
+
+
+1   166						     pop     cx
+1   167						     pop     dx
+1   168						     pop     si
+1   169						     pop     di
+1   170						     pop     bp
+1   171						     pop     ds
+1   172						     pop     es
+1   173						     endm
+1   174
+1   175
+    176
+    177	0000			     _TEXT	     segment byte public 'CODE'
+    178						     extrn   _int21_syscall:near
+    179						     extrn   _int25_handler:NEAR, _int26_handler:NEAR
+    180						     extrn   _set_stack:FAR
+    181						     extrn   _restore_stack:FAR
+    182						     extrn   _error_tos:WORD
+    183						     extrn   _char_api_tos:WORD
+    184						     extrn   _disk_api_tos:WORD
+    185						     extrn   _lpUserStack:DWORD
+    186						     extrn   _user_r:DWORD
+    187						     extrn   _ErrorMode:byte
+    188						     extrn   _InDOS:byte
+    189						     extrn   _cu_psp:word
+    190						     extrn   _MachineId:word
+    191						     extrn   critical_sp:word
+    192
+    193						     extrn   _api_sp:word	     ; api stacks - for	context
+    194						     extrn   _api_ss:word	     ; switching
+    195						     extrn   _usr_sp:word	     ; user stacks
+    196						     extrn   _usr_ss:word
+    197						     extrn   int21regs_seg:word
+    198						     extrn   int21regs_off:word
+    199
+    200						     public  _cpm_entry
+    201						     public  _int20_handler
+    202						     public  _int21_handler
+    203						     public  _low_int25_handler
+    204						     public  _low_int26_handler
+    205						     public  _int27_handler
+    206
+    207
+    208				     ;
+    209				     ; MS-DOS CP/M style entry point
+    210				     ;
+    211				     ;	     VOID FAR
+    212				     ;	     cpm_entry(iregs UserRegs)
+    213				     ;
+    214				     ; This one	is a strange one.  The call is to psp:0005h but	it returns to the
+    215				     ; function	after the call.	 What we do is convert it to a normal call and
+    216				     ; fudge the stack to look like an int 21h call.
+    217				     ;
+    218						     assume  cs:_TEXT
+    219	0000			     _cpm_entry	     proc    far
+    220						     ; Stack is:
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 5
+entry.ASM
+
+
+
+    221						     ;	     return offset
+    222						     ;	     psp seg
+    223						     ;	     000ah
+    224						     ;
+    225	0000  55				     push    bp		     ; trash old return	address
+    226	0001  8B EC				     mov     bp,sp
+    227	0003  87 6E 02				     xchg    bp,2[bp]
+    228	0006  5D				     pop     bp
+    229	0007  9C				     pushf		     ; start setting up	int 21h	stack
+    230						     ;
+    231						     ; now stack is
+    232						     ;	     return offset
+    233						     ;	     psp seg
+    234						     ;	     flags
+    235						     ;
+    236	0008  55				     push    bp
+    237	0009  8B EC				     mov     bp,sp	     ; set up reference	frame
+    238						     ;
+    239						     ; reference frame stack is
+    240						     ;	     return offset	     bp	+ 6
+    241						     ;	     psp seg		     bp	+ 4
+    242						     ;	     flags		     bp	+ 2
+    243						     ;	     bp		     <---    bp
+    244						     ;
+    245	000B  50				     push    ax
+    246	000C  8B 46 02				     mov     ax,2[bp]	     ; get the flags
+    247	000F  87 46 06				     xchg    ax,6[bp]	     ; swap with return	address
+    248	0012  89 46 02				     mov     2[bp],ax
+    249	0015  58				     pop     ax		     ; restore working registers
+    250	0016  5D				     pop     bp
+    251						     ;
+    252						     ; Done. Stack is
+    253						     ;	     flags
+    254						     ;	     psp seg (alias .COM cs)
+    255						     ;	     return offset
+    256						     ;
+    257	0017  80 F9 24				     cmp     cl,024h
+    258	001A  76 04				     jbe     cpm_error
+    259	001C  8A E1				     mov     ah,cl	     ; get the call # from cl to ah
+    260	001E  EB 20				     jmp     short _int21_handler    ; do the system call
+    261	0020  B0 00		     cpm_error:	     mov     al,0
+    262	0022  CF				     iret
+    263	0023			     _cpm_entry	     endp
+    264
+    265				     ;
+    266				     ; Restart the int 21h system call.	 Call never returns.
+    267				     ;
+    268				     ;	     VOID
+    269				     ;	     RestartSysCall(VOID);
+    270				     ;
+    271				     ; NOTE: On	exit, DS must point to kernel stack, SS:SP user	stack after
+    272				     ; PUSH$ALL	and BP == SP.
+    273				     ;
+    274	0023			     _RestartSysCall proc    near
+    275	0023  FA				     cli		     ; no interrupts
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 6
+entry.ASM
+
+
+
+    276	0024  2E: 8B 2E	0002e			     mov     bp,word ptr _lpUserStack+2	;Get frame
+    277	0029  8E D5				     mov     ss,bp
+    278	002B  2E: 8B 2E	0000e			     mov     bp,word ptr _lpUserStack
+    279	0030  8B E5				     mov     sp,bp
+    280	0032  FB				     sti
+    281						     POP$ALL		     ; get the original	regs
+1   282	0033  58				     pop     ax
+1   283	0034  5B				     pop     bx
+1   284	0035  59				     pop     cx
+1   285	0036  5A				     pop     dx
+1   286	0037  5E				     pop     si
+1   287	0038  5F				     pop     di
+1   288	0039  5D				     pop     bp
+1   289	003A  1F				     pop     ds
+1   290	003B  07				     pop     es
+    291	003C  EB 28				     jmp     short int21_reentry     ; restart the system call
+    292	003E			     _RestartSysCall endp
+    293
+    294
+    295				     ;
+    296				     ; Terminate the current process
+    297				     ;
+    298				     ;	     VOID INRPT	far
+    299				     ;	     int20_handler(iregs UserRegs)
+    300				     ;
+    301						     assume  cs:_TEXT
+    302	003E			     _int20_handler  proc    far
+    303	003E  B4 00				     mov     ah,0	     ; terminate through int 21h
+    304	0040			     _int20_handler  endp
+    305
+    306
+    307				     ;
+    308				     ; MS-DOS system call entry	point
+    309				     ;
+    310				     ;	     VOID INRPT	far
+    311				     ;	     int21_handler(iregs UserRegs)
+    312				     ;
+    313						     assume  cs:_TEXT
+    314	0040			     _int21_handler  proc    far
+    315						     ;
+    316						     ; Create the stack	frame for C call.  This	is done	to
+    317						     ; preserve	machine	state and provide a C structure	for
+    318						     ; access to registers.
+    319						     ;
+    320						     ; Since this is an	interrupt routine, CS, IP and flags were
+    321						     ; pushed onto the stack by	the processor, completing the
+    322						     ; stack frame.
+    323						     ;
+    324						     ; NB: stack frame is MS-DOS dependent and not compatible
+    325						     ; with compiler interrupt stack frames.
+    326						     ;
+    327						     PUSH$ALL
+1   328	0040  06				     push    es
+1   329	0041  1E				     push    ds
+1   330	0042  55				     push    bp
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 7
+entry.ASM
+
+
+
+1   331	0043  57				     push    di
+1   332	0044  56				     push    si
+1   333	0045  52				     push    dx
+1   334	0046  51				     push    cx
+1   335	0047  53				     push    bx
+1   336	0048  50				     push    ax
+    337
+    338						     ;
+    339						     ; Create kernel refernce frame.
+    340						     ;
+    341						     ; NB: At this point, SS !=	DS and won't be	set that way
+    342						     ; until later when	which stack to run on is determined.
+    343						     ;
+    344	0049  BD 0000s				     mov     bp,DGROUP
+    345	004C  8E DD				     mov     ds,bp
+    346
+    347						     ;
+    348						     ; Now DS is set, let's save our stack for rentry
+    349						     ;
+    350	004E  8C D5				     mov     bp,ss
+    351	0050  2E: 89 2E	0002e			     mov     word ptr _lpUserStack+2,bp
+    352	0055  2E: 89 2E	0002e			     mov     word ptr _user_r+2,bp
+    353	005A  8B EC				     mov     bp,sp
+    354	005C  2E: 89 2E	0000e			     mov     word ptr _lpUserStack,bp	     ; store and init
+    355	0061  2E: 89 2E	0000e			     mov     word ptr _user_r,bp     ; store and init
+    356
+    357						     ;
+    358						     ; Decide which stack to run on.
+    359						     ;
+    360						     ; Unlike previous versions	of DOS-C, we need to do	this here
+    361						     ; to guarantee the	user stack for critical	error handling.
+    362						     ; We need to do the int 24h from this stack location.
+    363						     ;
+    364						     ; There are actually four stacks to run on. The first is the
+    365						     ; user stack which	is determined by system	call number in
+    366						     ; AH.  The	next is	the error stack	determined by _ErrorMode.
+    367						     ; Then there's the	character stack	also determined	by system
+    368						     ; call number.  Finally, all others run on	the disk stack.
+    369						     ; They are	evaluated in that order.
+    370
+    371	0066  80 FC 33		     int21_reentry:  cmp     ah,33h
+    372	0069  74 0F				     je	     int21_user
+    373	006B  80 FC 50				     cmp     ah,50h
+    374	006E  74 0A				     je	     int21_user
+    375	0070  80 FC 51				     cmp     ah,51h
+    376	0073  74 05				     je	     int21_user
+    377	0075  80 FC 62				     cmp     ah,62h
+    378	0078  75 12				     jne     int21_1
+    379
+    380	007A  2E: FF 36	0002e	     int21_user:     push    word ptr _user_r+2
+    381	007F  2E: FF 36	0000e			     push    word ptr _user_r
+    382	0084  E8 0000e				     call    near ptr _int21_syscall
+    383	0087  59				     pop     cx
+    384	0088  59				     pop     cx
+    385	0089  EB 72 90				     jmp     int21_ret
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 8
+entry.ASM
+
+
+
+    386
+    387	008C  FB		     int21_1:	     sti
+    388	008D  2E: 80 3E	0000e 00		     cmp     _ErrorMode,0
+    389	0093  74 19				     je	     int21_2
+    390	0095  8C DD				     mov     bp,ds
+    391	0097  8E D5				     mov     ss,bp
+    392	0099  BD 0000e				     mov     bp,offset DGROUP:_error_tos
+    393	009C  8B E5				     mov     sp,bp
+    394	009E  FA				     cli
+    395	009F  2E: FF 36	0002e			     push    word ptr _user_r+2
+    396	00A4  2E: FF 36	0000e			     push    word ptr _user_r
+    397	00A9  E8 0000e				     call    near ptr _int21_syscall
+    398	00AC  EB 3A				     jmp     short int21_exit
+    399
+    400	00AE  2E: FE 06	0000e	     int21_2:	     inc     byte ptr _InDOS
+    401	00B3  80 FC 0C				     cmp     ah,0ch
+    402	00B6  7F 19				     jg	     int21_3
+    403	00B8  8C DD				     mov     bp,ds
+    404	00BA  8E D5				     mov     ss,bp
+    405	00BC  BD 0000e				     mov     bp,offset DGROUP:_char_api_tos
+    406	00BF  8B E5				     mov     sp,bp
+    407	00C1  FA				     cli
+    408	00C2  2E: FF 36	0002e			     push    word ptr _user_r+2
+    409	00C7  2E: FF 36	0000e			     push    word ptr _user_r
+    410	00CC  E8 0000e				     call    near ptr _int21_syscall
+    411	00CF  EB 17				     jmp     short int21_exit
+    412
+    413	00D1  8C DD		     int21_3:	     mov     bp,ds
+    414	00D3  8E D5				     mov     ss,bp
+    415	00D5  BD 0000e				     mov     bp,offset DGROUP:_disk_api_tos
+    416	00D8  8B E5				     mov     sp,bp
+    417	00DA  FA				     cli
+    418						     ;
+    419						     ; Push the	far pointer to the register frame for
+    420						     ; int21_syscall and remainder of kernel.
+    421						     ;
+    422	00DB  2E: FF 36	0002e			     push    word ptr _user_r+2
+    423	00E0  2E: FF 36	0000e			     push    word ptr _user_r
+    424	00E5  E8 0000e				     call    near ptr _int21_syscall
+    425
+    426						     ;
+    427						     ; Recover registers from system call.  Registers and flags
+    428						     ; were modified by	the system call.
+    429						     ;
+    430	00E8  FB		     int21_exit:     sti
+    431	00E9  2E: 8B 2E	0002e			     mov     bp,word ptr _user_r+2
+    432	00EE  8E D5				     mov     ss,bp
+    433	00F0  2E: 8B 2E	0000e			     mov     bp,word ptr _user_r     ; store and init
+    434	00F5  8B E5				     mov     sp,bp
+    435	00F7  2E: FE 0E	0000e			     dec     byte ptr _InDOS
+    436	00FC  FA				     cli
+    437	00FD			     int21_ret:	     POP$ALL
+1   438	00FD  58				     pop     ax
+1   439	00FE  5B				     pop     bx
+1   440	00FF  59				     pop     cx
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 9
+entry.ASM
+
+
+
+1   441	0100  5A				     pop     dx
+1   442	0101  5E				     pop     si
+1   443	0102  5F				     pop     di
+1   444	0103  5D				     pop     bp
+1   445	0104  1F				     pop     ds
+1   446	0105  07				     pop     es
+    447
+    448						     ;
+    449						     ; ... and return.
+    450						     ;
+    451	0106  CF				     iret
+    452	0107			     _int21_handler  endp
+    453
+    454
+    455
+    456				     ;
+    457				     ; Terminate the current process
+    458				     ;
+    459				     ;	     VOID INRPT	far
+    460				     ;	     int27_handler(iregs UserRegs)
+    461				     ;
+    462						     assume  cs:_TEXT
+    463	0107			     _int27_handler  proc    far
+    464						     ;
+    465						     ; First convert the memory	to paragraphs
+    466						     ;
+    467	0107  83 C2 0F				     add     dx,0fh	     ; round up
+    468	010A  D1 DA				     rcr     dx,1
+    469	010C  D1 EA				     shr     dx,1
+    470	010E  D1 EA				     shr     dx,1
+    471	0110  D1 EA				     shr     dx,1
+    472						     ;
+    473						     ; ... then	use the	standard system	call
+    474						     ;
+    475	0112  B8 3100				     mov     ax,3100h
+    476	0115  E9 FF28				     jmp     _int21_handler  ; terminate through int 21h
+    477	0118			     _int27_handler  endp
+    478
+    479				     ;
+    480				     ; I really	do need	to get rid of this because it's	the only thing stopping
+    481				     ; us from being ROMABLE.
+    482				     ;
+    483	0118  ????????		     stkframe	     dd	     ?
+    484
+    485	011C			     _low_int25_handler	 proc far
+    486	011C  FB				     sti
+    487	011D  9C				     pushf
+    488	011E  50				     push    ax
+    489	011F  51				     push    cx
+    490	0120  52				     push    dx
+    491	0121  53				     push    bx
+    492	0122  54				     push    sp
+    493	0123  55				     push    bp
+    494	0124  56				     push    si
+    495	0125  57				     push    di
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 10
+entry.ASM
+
+
+
+    496	0126  1E				     push    ds
+    497	0127  06				     push    es
+    498
+    499	0128  2E: 89 26	0118r			     mov     word ptr cs:stkframe, sp	  ; save stack frame
+    500	012D  2E: 8C 16	011Ar			     mov     word ptr cs:stkframe+2, ss
+    501
+    502	0132  FC				     cld
+    503	0133  B8 0000s				     mov     ax, seg DGROUP
+    504	0136  8E D8				     mov     ds, ax
+    505
+    506	0138  C7 06 0000e 0000e			     mov     word ptr DGROUP:_api_sp, offset DGROUP:_disk_api_tos
+    507	013E  8C 1E 0000e			     mov     word ptr DGROUP:_api_ss, ds
+    508
+    509	0142  0E E8 0000e			     call    far ptr _set_stack
+    510
+    511	0146  2E: FF 36	011Ar			     push    word ptr cs:stkframe+2
+    512	014B  2E: FF 36	0118r			     push    word ptr cs:stkframe
+    513	0150  E8 0000e				     call    _int25_handler
+    514	0153  83 C4 04				     add     sp, 4
+    515
+    516	0156  0E E8 0000e			     call    far ptr _restore_stack
+    517
+    518	015A  07				     pop     es
+    519	015B  1F				     pop     ds
+    520	015C  5F				     pop     di
+    521	015D  5E				     pop     si
+    522	015E  5D				     pop     bp
+    523	015F  5B				     pop     bx	     ; pop off sp value
+    524	0160  5B				     pop     bx
+    525	0161  5A				     pop     dx
+    526	0162  59				     pop     cx
+    527	0163  58				     pop     ax
+    528	0164  9D				     popf
+    529	0165  CB				     retf	     ; Bug-compatiblity	with MS-DOS.
+    530								     ; This function is	supposed to leave the original
+    531								     ; flag image on the stack.
+    532	0166			     _low_int25_handler	 endp
+    533
+    534
+    535	0166			     _low_int26_handler	 proc far
+    536	0166  FB				     sti
+    537	0167  9C				     pushf
+    538	0168  50				     push    ax
+    539	0169  51				     push    cx
+    540	016A  52				     push    dx
+    541	016B  53				     push    bx
+    542	016C  54				     push    sp
+    543	016D  55				     push    bp
+    544	016E  56				     push    si
+    545	016F  57				     push    di
+    546	0170  1E				     push    ds
+    547	0171  06				     push    es
+    548
+    549	0172  2E: 89 26	0118r			     mov     word ptr cs:stkframe, sp	  ; save stack frame
+    550	0177  2E: 8C 16	011Ar			     mov     word ptr cs:stkframe+2, ss
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 11
+entry.ASM
+
+
+
+    551
+    552	017C  FC				     cld
+    553	017D  B8 0000s				     mov     ax, seg DGROUP
+    554	0180  8E D8				     mov     ds, ax
+    555
+    556	0182  C7 06 0000e 0000e			     mov     word ptr DGROUP:_api_sp, offset DGROUP:_disk_api_tos
+    557	0188  8C 1E 0000e			     mov     word ptr DGROUP:_api_ss, ds
+    558
+    559	018C  0E E8 0000e			     call    far ptr _set_stack
+    560
+    561	0190  2E: FF 36	011Ar			     push    word ptr cs:stkframe+2
+    562	0195  2E: FF 36	0118r			     push    word ptr cs:stkframe
+    563	019A  E8 0000e				     call    _int26_handler
+    564	019D  83 C4 04				     add     sp, 4
+    565
+    566	01A0  0E E8 0000e			     call    far ptr _restore_stack
+    567
+    568	01A4  07				     pop     es
+    569	01A5  1F				     pop     ds
+    570	01A6  5F				     pop     di
+    571	01A7  5E				     pop     si
+    572	01A8  5D				     pop     bp
+    573	01A9  5B				     pop     bx	     ; pop off sp value
+    574	01AA  5B				     pop     bx
+    575	01AB  5A				     pop     dx
+    576	01AC  59				     pop     cx
+    577	01AD  58				     pop     ax
+    578	01AE  9D				     popf
+    579	01AF  CB				     retf
+    580	01B0			     _low_int26_handler	 endp
+    581
+    582
+    583	      =0000		     CONTINUE	     equ     00h
+    584	      =0001		     RETRY	     equ     01h
+    585	      =0002		     ABORT	     equ     02h
+    586	      =0003		     FAIL	     equ     03h
+    587
+    588	      =0020		     OK_IGNORE	     equ     20h
+    589	      =0010		     OK_RETRY	     equ     10h
+    590	      =0008		     OK_FAIL	     equ     08h
+    591
+    592	      =0016		     PSP_PARENT	     equ     16h
+    593	      =002E		     PSP_USERSP	     equ     2eh
+    594	      =0030		     PSP_USERSS	     equ     30h
+    595
+    596
+    597				     ;
+    598				     ; Default Int 24h handler -- always returns fail
+    599				     ;
+    600						     public  _int24_handler
+    601	01B0  B0 03		     _int24_handler: mov     al,FAIL
+    602	01B2  CF				     iret
+    603
+    604				     ;
+    605				     ; COUNT
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 12
+entry.ASM
+
+
+
+    606				     ; CriticalError(COUNT nFlag, COUNT	nDrive,	COUNT nError, struct dhdr FAR *lpDevice);
+    607				     ;
+    608						     public  _CriticalError
+    609	01B3			     _CriticalError  proc    near
+    610						     ;
+    611						     ; Skip critical error routine if handler is active
+    612						     ;
+    613	01B3  80 3E 0000e 00			     cmp     byte ptr ds:_ErrorMode,0
+    614	01B8  74 04				     je	     CritErr05		     ; Jump if equal
+    615
+    616	01BA  B8 0003				     mov     ax,FAIL
+    617	01BD  C3				     retn
+    618						     ;
+    619						     ; Do local	error processing
+    620						     ;
+    621	01BE			     CritErr05:
+    622						     ;
+    623						     ; C Entry
+    624						     ;
+    625	01BE  55				     push    bp
+    626	01BF  8B EC				     mov     bp,sp
+    627	01C1  56				     push    si
+    628	01C2  57				     push    di
+    629						     ;
+    630						     ; Get parameters
+    631						     ;
+    632	01C3  8A 66 04				     mov     ah,byte ptr [bp+4]	     ; nFlags
+    633	01C6  8A 46 06				     mov     al,byte ptr [bp+6]	     ; nDrive
+    634	01C9  8B 7E 08				     mov     di,word ptr [bp+8]	     ; nError
+    635						     ;
+    636						     ;	     make bp:si	point to dev header
+    637						     ;
+    638	01CC  8B 76 0A				     mov     si,word ptr [bp+10]     ; lpDevice	Offset
+    639	01CF  8B 6E 0C				     mov     bp,word ptr [bp+12]     ; lpDevice	segment
+    640						     ;
+    641						     ; Now save	real ss:sp and retry info in internal stack
+    642						     ;
+    643	01D2  FA				     cli
+    644	01D3  8E 06 0000e			     mov     es,ds:_cu_psp
+    645	01D7  26: FF 36	0030			     push    word ptr es:PSP_USERSS
+    646	01DC  26: FF 36	002E			     push    word ptr es:PSP_USERSP
+    647	01E1  FF 36 0000e			     push    word ptr ds:_MachineId
+    648	01E5  FF 36 0000e			     push    word ptr ds:int21regs_seg
+    649	01E9  FF 36 0000e			     push    word ptr ds:int21regs_off
+    650	01ED  FF 36 0000e			     push    word ptr ds:_api_sp
+    651	01F1  FF 36 0000e			     push    word ptr ds:_api_ss
+    652	01F5  FF 36 0000e			     push    word ptr ds:_usr_sp
+    653	01F9  FF 36 0000e			     push    word ptr ds:_usr_ss
+    654	01FD  FF 36 0002e			     push    word ptr ds:_user_r+2
+    655	0201  FF 36 0000e			     push    word ptr ds:_user_r
+    656	0205  89 26 0000e			     mov     ds:critical_sp,sp
+    657						     ;
+    658						     ; do some clean up	because	user may never return
+    659						     ;
+    660	0209  FE 06 0000e			     inc     byte ptr ds:_ErrorMode
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 13
+entry.ASM
+
+
+
+    661	020D  FE 0E 0000e			     dec     byte ptr ds:_InDOS
+    662						     ;
+    663						     ; switch to user's	stack
+    664						     ;
+    665	0211  26: 8E 16	0030			     mov     ss,es:PSP_USERSS
+    666	0216  26: 8B 26	002E			     mov     sp,es:PSP_USERSP
+    667						     ;
+    668						     ; and call	critical error handler
+    669						     ;
+    670	021B  CD 24				     int     24h		     ; DOS Critical error handler
+    671
+    672						     ;
+    673						     ; recover context
+    674						     ;
+    675	021D  FC				     cld
+    676	021E  FA				     cli
+    677	021F  BD 0000s				     mov     bp, seg DGROUP
+    678	0222  8E DD				     mov     ds,bp
+    679	0224  8E D5				     mov     ss,bp
+    680	0226  8B 26 0000e			     mov     sp,ds:critical_sp
+    681	022A  8F 06 0000e			     pop     word ptr ds:_user_r
+    682	022E  8F 06 0002e			     pop     word ptr ds:_user_r+2
+    683	0232  8F 06 0000e			     pop     word ptr ds:_usr_ss
+    684	0236  8F 06 0000e			     pop     word ptr ds:_usr_sp
+    685	023A  8F 06 0000e			     pop     word ptr ds:_api_ss
+    686	023E  8F 06 0000e			     pop     word ptr ds:_api_sp
+    687	0242  8F 06 0000e			     pop     word ptr ds:int21regs_off
+    688	0246  8F 06 0000e			     pop     word ptr ds:int21regs_seg
+    689	024A  8F 06 0000e			     pop     word ptr ds:_MachineId
+    690	024E  8E 06 0000e			     mov     es,ds:_cu_psp
+    691	0252  26: 8F 06	002E			     pop     word ptr es:PSP_USERSP
+    692	0257  26: 8F 06	0030			     pop     word ptr es:PSP_USERSS
+    693	025C  FB				     sti			     ; Enable interrupts
+    694						     ;
+    695						     ; clear flags
+    696						     ;
+    697	025D  C6 06 0000e 00			     mov     byte ptr ds:_ErrorMode,0
+    698	0262  FE 06 0000e			     inc     byte ptr ds:_InDOS
+    699						     ;
+    700						     ; Check for ignore	and force fail if not ok
+    701	0266  3C 00				     cmp     al,CONTINUE
+    702	0268  75 07				     jne     CritErr10		     ; not ignore, keep	testing
+    703	026A  F6 C7 20				     test    bh,OK_IGNORE
+    704	026D  75 02				     jnz     CritErr10
+    705	026F  B0 03				     mov     al,FAIL
+    706						     ;
+    707						     ; Check for retry and force fail if not ok
+    708						     ;
+    709	0271			     CritErr10:
+    710	0271  3C 01				     cmp     al,RETRY
+    711	0273  75 07				     jne     CritErr20		     ; not retry, keep testing
+    712	0275  F6 C7 10				     test    bh,OK_RETRY
+    713	0278  75 02				     jnz     CritErr20
+    714	027A  B0 03				     mov     al,FAIL
+    715						     ;
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 14
+entry.ASM
+
+
+
+    716						     ; You know	the drill, but now it's	different.
+    717						     ; check for fail and force	abort if not ok
+    718						     ;
+    719	027C			     CritErr20:
+    720	027C  3C 03				     cmp     al,FAIL
+    721	027E  75 07				     jne     CritErr30		     ; not fail, do exit processing
+    722	0280  F6 C7 08				     test    bh,OK_FAIL
+    723	0283  75 02				     jnz     CritErr30
+    724	0285  B0 02				     mov     al,ABORT
+    725						     ;
+    726						     ; OK, if it's abort we do extra processing.  Otherwise just
+    727						     ; exit.
+    728						     ;
+    729	0287			     CritErr30:
+    730	0287  3C 02				     cmp     al,ABORT
+    731	0289  74 06				     je	     CritErrAbort	     ; process abort
+    732
+    733	028B			     CritErrExit:
+    734	028B  32 E4				     xor     ah,ah		     ; clear out top for return
+    735	028D  5F				     pop     di
+    736	028E  5E				     pop     si
+    737	028F  5D				     pop     bp
+    738	0290  C3				     ret
+    739
+    740						     ;
+    741						     ; Abort processing.
+    742						     ;
+    743	0291			     CritErrAbort:
+    744	0291  A1 0000e				     mov     ax,ds:_cu_psp
+    745	0294  8E C0				     mov     es,ax
+    746	0296  26: 3B 06	0016			     cmp     ax,es:PSP_PARENT
+    747	029B  B0 03				     mov     al,FAIL
+    748	029D  74 EC				     jz	     CritErrExit
+    749	029F  FA				     cli
+    750	02A0  2E: 8B 2E	0002e			     mov     bp,word ptr _user_r+2   ;Get frame
+    751	02A5  8E D5				     mov     ss,bp
+    752	02A7  8E C5				     mov     es,bp
+    753	02A9  2E: 8B 2E	0000e			     mov     bp,word ptr _user_r
+    754	02AE  8B E5				     mov     sp,bp
+    755	02B0  C6 06 0000e 01			     mov     byte ptr ds:_ErrorMode,1	     ; flag abort
+    756	02B5  B8 4C00				     mov     ax,4C00h
+    757	02B8  26: A3 0000			     mov     es:reg_ax,ax
+    758	02BC  FB				     sti
+    759	02BD  E9 FDA6				     jmp     int21_reentry	     ; restart the system call
+    760	02C0			     _CriticalError  endp
+    761	02C0			     _TEXT	     ends
+    762						     end
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 15
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "12/06/98"
+??FILENAME			  Text	 "entry	  "
+??TIME				  Text	 "09:46:42"
+??VERSION			  Number 030A
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _TEXT
+@FILENAME			  Text	 ENTRY
+@WORDSIZE			  Text	 2
+ABORT				  Number 0002
+CONTINUE			  Number 0000
+CPM_ERROR			  Near	 _TEXT:0020
+CRITERR05			  Near	 _TEXT:01BE
+CRITERR10			  Near	 _TEXT:0271
+CRITERR20			  Near	 _TEXT:027C
+CRITERR30			  Near	 _TEXT:0287
+CRITERRABORT			  Near	 _TEXT:0291
+CRITERREXIT			  Near	 _TEXT:028B
+CRITICAL_SP (critical_sp)	  Word	 _TEXT:---- Extern
+FAIL				  Number 0003
+INT21REGS_OFF (int21regs_off)	  Word	 _TEXT:---- Extern
+INT21REGS_SEG (int21regs_seg)	  Word	 _TEXT:---- Extern
+INT21_1				  Near	 _TEXT:008C
+INT21_2				  Near	 _TEXT:00AE
+INT21_3				  Near	 _TEXT:00D1
+INT21_EXIT			  Near	 _TEXT:00E8
+INT21_REENTRY			  Near	 _TEXT:0066
+INT21_RET			  Near	 _TEXT:00FD
+INT21_USER			  Near	 _TEXT:007A
+OK_FAIL				  Number 0008
+OK_IGNORE			  Number 0020
+OK_RETRY			  Number 0010
+PSP_PARENT			  Number 0016
+PSP_USERSP			  Number 002E
+PSP_USERSS			  Number 0030
+RETRY				  Number 0001
+STANDALONE			  Text	 1
+STKFRAME			  Dword	 _TEXT:0118
+_API_SP	(_api_sp)		  Word	 _TEXT:---- Extern
+_API_SS	(_api_ss)		  Word	 _TEXT:---- Extern
+_CHAR_API_TOS (_char_api_tos)	  Word	 _TEXT:---- Extern
+_CPM_ENTRY (_cpm_entry)		  Far	 _TEXT:0000
+_CRITICALERROR (_CriticalError)	  Near	 _TEXT:01B3
+_CU_PSP	(_cu_psp)		  Word	 _TEXT:---- Extern
+_DISK_API_TOS (_disk_api_tos)	  Word	 _TEXT:---- Extern
+_ERRORMODE (_ErrorMode)		  Byte	 _TEXT:---- Extern
+_ERROR_TOS (_error_tos)		  Word	 _TEXT:---- Extern
+_INDOS (_InDOS)			  Byte	 _TEXT:---- Extern
+_INT20_HANDLER (_int20_handler)	  Far	 _TEXT:003E
+_INT21_HANDLER (_int21_handler)	  Far	 _TEXT:0040
+_INT21_SYSCALL (_int21_syscall)	  Near	 _TEXT:---- Extern
+_INT24_HANDLER (_int24_handler)	  Near	 _TEXT:01B0
+_INT25_HANDLER (_int25_handler)	  Near	 _TEXT:---- Extern
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 16
+Symbol Table
+
+
+
+_INT26_HANDLER (_int26_handler)	  Near	 _TEXT:---- Extern
+_INT27_HANDLER (_int27_handler)	  Far	 _TEXT:0107
+_LOW_INT25_HANDLER	       +  Far	 _TEXT:011C
+(_low_int25_handler)
+_LOW_INT26_HANDLER	       +  Far	 _TEXT:0166
+(_low_int26_handler)
+_LPUSERSTACK (_lpUserStack)	  Dword	 _TEXT:---- Extern
+_MACHINEID (_MachineId)		  Word	 _TEXT:---- Extern
+_RESTARTSYSCALL			  Near	 _TEXT:0023
+_RESTORE_STACK (_restore_stack)	  Far	 _TEXT:---- Extern
+_SET_STACK (_set_stack)		  Far	 _TEXT:---- Extern
+_USER_R	(_user_r)		  Dword	 _TEXT:---- Extern
+_USR_SP	(_usr_sp)		  Word	 _TEXT:---- Extern
+_USR_SS	(_usr_ss)		  Word	 _TEXT:---- Extern
+
+Macro Name
+
+POP$ALL
+PUSH$ALL
+
+Structure Name			  Type	Offset
+
+REGFRAME
+ REG_AX				  Word	 0000
+ REG_BX				  Word	 0002
+ REG_CX				  Word	 0004
+ REG_DX				  Word	 0006
+ REG_SI				  Word	 0008
+ REG_DI				  Word	 000A
+ REG_BP				  Word	 000C
+ REG_DS				  Word	 000E
+ REG_ES				  Word	 0010
+ REG_IP				  Word	 0012
+ REG_CS				  Word	 0014
+ REG_FLAGS			  Word	 0016
+ IRP_LOW			  Word	 0018
+ IRP_HI				  Word	 001A
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _BSS				  16  0000 Word	  Public  BSS
+  _BSSEND			  16  0000 Byte	  Public  STACK
+  _DATA				  16  0000 Word	  Public  DATA
+  _FIXED_DATA			  16  0000 Para	  Public  DATA
+_TEXT				  16  02C0 Byte	  Public  CODE
+

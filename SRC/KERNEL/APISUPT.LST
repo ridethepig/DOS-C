@@ -1,0 +1,225 @@
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 1
+APISUPT.ASM
+
+
+
+      1				     ; File:
+      2				     ;			       apisupt.asm
+      3				     ; Description:
+      4				     ;	   Assembly support routines for stack manipulation, etc.
+      5				     ;
+      6				     ;			  Copyright (c)	1995, 1998
+      7				     ;			     Pasquale J. Villani
+      8				     ;			     All Rights	Reserved
+      9				     ;
+     10				     ; This file is part of DOS-C.
+     11				     ;
+     12				     ; DOS-C is	free software; you can redistribute it and/or
+     13				     ; modify it under the terms of the	GNU General Public License
+     14				     ; as published by the Free	Software Foundation; either version
+     15				     ; 2, or (at your option) any later	version.
+     16				     ;
+     17				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+     18				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+     19				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+     20				     ; the GNU General Public License for more details.
+     21				     ;
+     22				     ; You should have received	a copy of the GNU General Public
+     23				     ; License along with DOS-C; see the file COPYING.	If not,
+     24				     ; write to	the Free Software Foundation, 675 Mass Ave,
+     25				     ; Cambridge, MA 02139, USA.
+     26				     ;
+     27				     ; $Logfile:   C:/usr/patv/dos-c/src/kernel/apisupt.asv  $
+     28				     ;
+     29				     ; $Header:	  C:/usr/patv/dos-c/src/kernel/apisupt.asv   1.4   06 Dec 1998	8:47:02	  patv	$
+     30				     ;
+     31				     ; $Log:   C:/usr/patv/dos-c/src/kernel/apisupt.asv	 $
+     32				     ;
+     33				     ;	 Rev 1.4   06 Dec 1998	8:47:02	  patv
+     34				     ;Expanded due to new I/O subsystem.
+     35				     ;
+     36				     ;	 Rev 1.3   16 Jan 1997 12:46:44	  patv
+     37				     ;pre-Release 0.92 feature additions
+     38				     ;
+     39				     ;	 Rev 1.2   29 May 1996 21:03:38	  patv
+     40				     ;bug fixes	for v0.91a
+     41				     ;
+     42				     ;	 Rev 1.1   01 Sep 1995 17:54:26	  patv
+     43				     ;First GPL	release.
+     44				     ;
+     45				     ;	 Rev 1.0   02 Jul 1995	9:04:50	  patv
+     46				     ;Initial revision.
+     47				     ; $EndLog$
+     48				     ;
+     49
+     50
+     51	0000			     _TEXT	     segment byte public 'CODE'
+     52				     DGROUP	     group   _DATA,_BSS,_BSSEND		     ; small model
+     53						     assume  cs:_TEXT,ds:DGROUP,ss:DGROUP
+     54	0000			     _TEXT	     ends
+     55
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 2
+APISUPT.ASM
+
+
+
+     56	0000			     _DATA	     segment word public 'DATA'
+     57	0000			     _DATA	     ends
+     58
+     59	0000			     _BSS	     segment word public 'BSS'
+     60	0000			     _BSS	     ends
+     61
+     62	0000			     _BSSEND	     segment byte public 'STACK'
+     63	0000			     _BSSEND	     ends
+     64
+     65
+     66						     extrn   _api_sp:word	     ; api stacks - for	context
+     67						     extrn   _api_ss:word	     ; switching
+     68						     extrn   _usr_sp:word	     ; user stacks
+     69						     extrn   _usr_ss:word
+     70
+     71	0000			     _TEXT	     segment
+     72						     assume  cs: _TEXT
+     73						     public  _set_stack
+     74				     ;
+     75				     ; void far	set_stack(void)	-
+     76				     ;	     save current stack	and setup our local stack
+     77				     ;
+     78	0000			     _set_stack	     proc    far
+     79
+     80						     ; save foreground stack
+     81
+     82						     ; we need to get the return values	from the stack
+     83						     ; since the current stack will change
+     84	0000  58				     pop     ax			     ;get return offset
+     85	0001  5B				     pop     bx			     ;get return segment
+     86
+     87						     ; Save the	flags so that we can restore correct interrupt
+     88						     ; state later. We need to disable interrupts so that we
+     89						     ; don't trash memory with new sp-old ss combination
+     90	0002  9C				     pushf
+     91	0003  5A				     pop     dx
+     92	0004  FA				     cli
+     93
+     94						     ; save bp
+     95	0005  55				     push    bp
+     96
+     97	0006  8B CC				     mov     cx, sp
+     98	0008  F7 D9				     neg     cx
+     99
+    100						     ; save away foreground process' stack
+    101	000A  FF 36 0000e			     push    word ptr DGROUP:_usr_ss
+    102	000E  FF 36 0000e			     push    word ptr DGROUP:_usr_sp
+    103
+    104	0012  8C 16 0000e			     mov     word ptr DGROUP:_usr_ss,ss
+    105	0016  89 26 0000e			     mov     word ptr DGROUP:_usr_sp,sp
+    106
+    107						     ; setup our local stack
+    108	001A  8E 16 0000e			     mov     ss,word ptr DGROUP:_api_ss
+    109	001E  8B 26 0000e			     mov     sp,word ptr DGROUP:_api_sp
+    110
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 3
+APISUPT.ASM
+
+
+
+    111	0022  03 CC				     add     cx, sp
+    112	0024  03 E9				     add     bp, cx
+    113
+    114						     ; setup for ret
+    115	0026  53				     push    bx
+    116	0027  50				     push    ax
+    117
+    118						     ; now restore interrupt state
+    119	0028  52				     push    dx
+    120	0029  9D				     popf
+    121
+    122	002A  CB				     ret
+    123
+    124	002B			     _set_stack	     endp
+    125
+    126				     ;
+    127				     ; void far	restore_stack(void) -
+    128				     ;	     restore foreground	stack, throw ours away
+    129				     ;
+    130						     public  _restore_stack
+    131	002B			     _restore_stack  proc    far
+    132
+    133					     ; we need to get the return values	from the stack
+    134					     ; since the current stack will change
+    135	002B  59				     pop     cx			     ;get return offset
+    136	002C  5B				     pop     bx			     ;get return segment
+    137
+    138						     ; Save the	flags so that we can restore correct interrupt
+    139						     ; state later. We need to disable interrupts so that we
+    140						     ; don't trash memory with new sp-old ss combination
+    141	002D  9C				     pushf
+    142	002E  5A				     pop     dx
+    143	002F  FA				     cli
+    144
+    145						     ; save background stack
+    146	0030  8C 16 0000e			     mov     word ptr DGROUP:_api_ss,ss
+    147	0034  89 26 0000e			     mov     word ptr DGROUP:_api_sp,sp
+    148
+    149						     ; restore foreground stack	here
+    150	0038  8E 16 0000e			     mov     ss,word ptr DGROUP:_usr_ss
+    151	003C  8B 26 0000e			     mov     sp,word ptr DGROUP:_usr_sp
+    152
+    153	0040  8F 06 0000e			     pop     word ptr DGROUP:_usr_sp
+    154	0044  8F 06 0000e			     pop     word ptr DGROUP:_usr_ss
+    155
+    156						     ; make bp relative	to our stack frame
+    157	0048  5D				     pop     bp
+    158						     ;mov     bp,sp
+    159
+    160						     ; setup for ret
+    161	0049  53				     push    bx
+    162	004A  51				     push    cx
+    163
+    164						     ; now restore interrupt state
+    165	004B  52				     push    dx
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 4
+APISUPT.ASM
+
+
+
+    166	004C  9D				     popf
+    167
+    168	004D  CB				     ret
+    169	004E			     _restore_stack  endp
+    170
+    171	004E			     _TEXT	     ends
+    172
+    173						     end
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 5
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "12/06/98"
+??FILENAME			  Text	 "APISUPT "
+??TIME				  Text	 "09:46:53"
+??VERSION			  Number 030A
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _TEXT
+@FILENAME			  Text	 APISUPT
+@WORDSIZE			  Text	 2
+STANDALONE			  Text	 1
+_API_SP	(_api_sp)		  Word	 ----:---- Extern
+_API_SS	(_api_ss)		  Word	 ----:---- Extern
+_RESTORE_STACK (_restore_stack)	  Far	 _TEXT:002B
+_SET_STACK (_set_stack)		  Far	 _TEXT:0000
+_USR_SP	(_usr_sp)		  Word	 ----:---- Extern
+_USR_SS	(_usr_ss)		  Word	 ----:---- Extern
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _BSS				  16  0000 Word	  Public  BSS
+  _BSSEND			  16  0000 Byte	  Public  STACK
+  _DATA				  16  0000 Word	  Public  DATA
+_TEXT				  16  004E Byte	  Public  CODE
+

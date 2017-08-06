@@ -1,0 +1,142 @@
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 1
+nlssupt.ASM
+
+
+
+      1				     ; File:
+      2				     ;			       nls.asm
+      3				     ; Description:
+      4				     ;	   Assembly support routines for nls functions.
+      5				     ;
+      6				     ;			  Copyright (c)	1995, 1998
+      7				     ;			     Pasquale J. Villani
+      8				     ;			     All Rights	Reserved
+      9				     ;
+     10				     ; This file is part of DOS-C.
+     11				     ;
+     12				     ; DOS-C is	free software; you can redistribute it and/or
+     13				     ; modify it under the terms of the	GNU General Public License
+     14				     ; as published by the Free	Software Foundation; either version
+     15				     ; 2, or (at your option) any later	version.
+     16				     ;
+     17				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+     18				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+     19				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+     20				     ; the GNU General Public License for more details.
+     21				     ;
+     22				     ; You should have received	a copy of the GNU General Public
+     23				     ; License along with DOS-C; see the file COPYING.	If not,
+     24				     ; write to	the Free Software Foundation, 675 Mass Ave,
+     25				     ; Cambridge, MA 02139, USA.
+     26				     ;
+     27				     ; $Logfile:   C:/usr/patv/dos-c/src/kernel/nlssupt.asv  $
+     28				     ;
+     29				     ; $Header:	  C:/usr/patv/dos-c/src/kernel/nlssupt.asv   1.3   06 Dec 1998	8:46:56	  patv	$
+     30				     ;
+     31				     ; $Log:   C:/usr/patv/dos-c/src/kernel/nlssupt.asv	 $
+     32				     ;
+     33				     ;	   Rev 1.3   06	Dec 1998  8:46:56   patv
+     34				     ;	Bug fixes.
+     35				     ;
+     36				     ;	   Rev 1.2   16	Jan 1997 12:46:44   patv
+     37				     ;	pre-Release 0.92 feature additions
+     38				     ;
+     39				     ;	   Rev 1.1   29	May 1996 21:03:38   patv
+     40				     ;	bug fixes for v0.91a
+     41				     ;
+     42				     ;	   Rev 1.0   19	Feb 1996  3:24:04   patv
+     43				     ;	Added NLS, int2f and config.sys	processing
+     44				     ; $EndLog$
+     45				     ;
+     46
+     47
+     48	0000			     _TEXT	     segment byte public 'CODE'
+     49				     DGROUP	     group   _DATA,_BSS,_BSSEND		     ; small model
+     50						     assume  cs:_TEXT,ds:DGROUP,ss:DGROUP
+     51	0000			     _TEXT	     ends
+     52
+     53	0000			     _DATA	     segment word public 'DATA'
+     54	0000			     _DATA	     ends
+     55
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 2
+nlssupt.ASM
+
+
+
+     56	0000			     _BSS	     segment word public 'BSS'
+     57	0000			     _BSS	     ends
+     58
+     59	0000			     _BSSEND	     segment byte public 'STACK'
+     60	0000			     _BSSEND	     ends
+     61
+     62
+     63	0000			     _TEXT	     segment
+     64						     assume  cs: _TEXT
+     65						     public  _CharMapSrvc
+     66						     extrn   _internalUpcase:near
+     67				     ;
+     68				     ; CharMapSrvc:
+     69				     ;	     User callable character mapping service.
+     70				     ;	     Part of Function 38h
+     71				     ;
+     72	0000			     _CharMapSrvc    proc    far
+     73	0000  1E				     push    ds
+     74	0001  06				     push    es
+     75	0002  55				     push    bp
+     76	0003  56				     push    si
+     77	0004  57				     push    di
+     78	0005  52				     push    dx
+     79	0006  51				     push    cx
+     80	0007  53				     push    bx
+     81
+     82	0008  BA 0000s				     mov     dx, seg DGROUP
+     83	000B  8E DA				     mov     ds, dx
+     84
+     85	000D  50				     push    ax
+     86	000E  E8 0000e				     call    _internalUpcase
+     87	0011  83 C4 02				     add     sp, 2
+     88
+     89	0014  5B				     pop     bx
+     90	0015  59				     pop     cx
+     91	0016  5A				     pop     dx
+     92	0017  5F				     pop     di
+     93	0018  5E				     pop     si
+     94	0019  5D				     pop     bp
+     95	001A  07				     pop     es
+     96	001B  1F				     pop     ds
+     97	001C  CB				     retf			     ; Return far
+     98	001D			     _CharMapSrvc    endp
+     99
+    100
+    101	001D			     _TEXT	     ends
+    102
+    103						     end
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 3
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "12/06/98"
+??FILENAME			  Text	 "nlssupt "
+??TIME				  Text	 "09:46:53"
+??VERSION			  Number 030A
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _TEXT
+@FILENAME			  Text	 NLSSUPT
+@WORDSIZE			  Text	 2
+STANDALONE			  Text	 1
+_CHARMAPSRVC (_CharMapSrvc)	  Far	 _TEXT:0000
+_INTERNALUPCASE		       +  Near	 _TEXT:---- Extern
+(_internalUpcase)
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _BSS				  16  0000 Word	  Public  BSS
+  _BSSEND			  16  0000 Byte	  Public  STACK
+  _DATA				  16  0000 Word	  Public  DATA
+_TEXT				  16  001D Byte	  Public  CODE
+

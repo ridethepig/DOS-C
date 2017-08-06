@@ -1,0 +1,727 @@
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:39	    Page 1
+boot.ASM
+
+
+
+      1				     ;
+      2				     ; File:
+      3				     ;				  boot.asm
+      4				     ; Description:
+      5				     ;				 DOS-C boot
+      6				     ;
+      7				     ;			     Copyright (c) 1997;
+      8				     ;				 Svante	Frey
+      9				     ;			     All Rights	Reserved
+     10				     ;
+     11				     ; This file is part of DOS-C.
+     12				     ;
+     13				     ; DOS-C is	free software; you can redistribute it and/or
+     14				     ; modify it under the terms of the	GNU General Public License
+     15				     ; as published by the Free	Software Foundation; either version
+     16				     ; 2, or (at your option) any later	version.
+     17				     ;
+     18				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+     19				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+     20				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+     21				     ; the GNU General Public License for more details.
+     22				     ;
+     23				     ; You should have received	a copy of the GNU General Public
+     24				     ; License along with DOS-C; see the file COPYING.	If not,
+     25				     ; write to	the Free Software Foundation, 675 Mass Ave,
+     26				     ; Cambridge, MA 02139, USA.
+     27				     ;
+     28				     ; $Logfile:   C:/dos-c/src/boot/boot.asv  $
+     29				     ;
+     30				     ; $Header:	  C:/dos-c/src/boot/boot.asv   1.5   10	Jan 1997  4:58:06   patv  $
+     31				     ;
+     32				     ; $Log:   C:/dos-c/src/boot/boot.asv  $
+     33				     ;
+     34				     ;		Rev 1.5	  10 Jan 1997  4:58:06	 patv
+     35				     ;	     Corrected copyright
+     36				     ;
+     37				     ;		Rev 1.4	  10 Jan 1997  4:52:50	 patv
+     38				     ;	     Re-written	to support C drive and eliminate restrictions on IPL.SYS
+     39				     ;
+     40				     ;		Rev 1.3	  29 Aug 1996 13:06:50	 patv
+     41				     ;	     Bug fixes for v0.91b
+     42				     ;
+     43				     ;		Rev 1.2	  01 Sep 1995 17:56:44	 patv
+     44				     ;	     First GPL release.
+     45				     ;
+     46				     ;		Rev 1.1	  30 Jul 1995 20:37:38	 patv
+     47				     ;	     Initialized stack before use.
+     48				     ;
+     49				     ;		Rev 1.0	  02 Jul 1995 10:57:52	 patv
+     50				     ;	     Initial revision.
+     51				     ;
+     52
+     53
+     54
+     55
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:39	    Page 2
+boot.ASM
+
+
+
+     56	0000			     TEXT SEGMENT WORD PUBLIC 'TEXT'
+     57				     ASSUME CS:TEXT, DS:TEXT
+     58
+     59	      =0000		     BASE	     equ     0
+     60
+     61
+     62						     org     BASE
+     63	0000  EB 3E 90		     Entry:	     jmp     real_start
+     64
+     65				     ;	     bp	is initialized to 7c00h
+     66	      =	[bp+3]		     oem	     equ     [bp+3]
+     67	      =	[bp+0bh]	     bytesPerSector  equ     [bp+0bh]
+     68	      =	[bp+0dh]	     sectPerCluster  equ     [bp+0dh]
+     69	      =	[bp+0eh]	     resSectors	     equ     [bp+0eh]
+     70	      =	[bp+10h]	     nFats	     equ     [bp+10h]
+     71	      =	[bp+11h]	     nRootDir	     equ     [bp+11h]
+     72	      =	[bp+13h]	     nSectors	     equ     [bp+13h]
+     73	      =	[bp+15h]	     MID	     equ     [bp+15h]
+     74	      =	[bp+16h]	     sectPerFat	     equ     [bp+16h]
+     75	      =	[bp+18h]	     sectPerTrack    equ     [bp+18h]
+     76	      =	[bp+1ah]	     nHeads	     equ     [bp+1ah]
+     77	      =	[bp+1ch]	     nHidden	     equ     [bp+1ch]
+     78	      =	[bp+20h]	     nSectorHuge     equ     [bp+20h]
+     79	      =	[bp+24h]	     drive	     equ     [bp+24h]
+     80	      =	[bp+26h]	     extBoot	     equ     [bp+26h]
+     81	      =	[bp+27h]	     volid	     equ     [bp+27h]
+     82	      =	[bp+2bh]	     vollabel	     equ     [bp+2bh]
+     83	      =	[bp+36h]	     filesys	     equ     [bp+36h]
+     84
+     85	      =2000		     LOADSEG	     equ     2000h
+     86
+     87	      =4000		     FATBUF	     equ     4000h	     ; offset of temporary buffer for FAT
+     88									     ; chain
+     89	      =0005		     RETRYCOUNT	     equ     5		     ; number of retries on disk errors
+     90
+     91				     ;	     Some extra	variables that are created on the stack	frame
+     92
+     93	      =	[bp-4]		     fat_start	     equ     [bp-4]	     ; first FAT sector
+     94	      =	[bp-8]		     root_dir_start  equ     [bp-8]	     ; first root directory sector
+     95	      =	[bp-12]		     data_start	     equ     [bp-12]	     ; first data sector
+     96
+     97
+     98				     ;	     To	save space, functions that are just called once	are
+     99				     ;	     implemented as macros instead. Four bytes are saved by
+    100				     ;	     avoiding the call / ret instructions.
+    101
+    102
+    103				     ;	     FINDFILE: Searches	for the	file in	the root directory.
+    104				     ;
+    105				     ;	     Returns:
+    106				     ;
+    107				     ;	     If	file not found:	     CF	set
+    108				     ;
+    109				     ;	     If	file found:	     CF	clear
+    110				     ;				     AX	= first	cluster	of file
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:39	    Page 3
+boot.ASM
+
+
+
+    111
+    112
+    113				     FINDFILE	     MACRO
+    114						     ; First, read the whole root directory
+    115						     ; into the	temporary buffer.
+    116
+    117						     mov     ax, word ptr root_dir_start
+    118						     mov     dx, word ptr root_dir_start+2
+    119						     mov     di, nRootDir
+    120						     xor     bx, bx
+    121						     mov     es, tempbuf
+    122						     call    readDisk
+    123						     jc	     ffDone
+    124
+    125						     xor     di, di
+    126
+    127				     next_entry:     mov     cx, 11
+    128						     mov     si, offset	filename+7c00h
+    129						     push    di
+    130						     repe    cmpsb
+    131						     pop     di
+    132						     mov     ax, es:[di][1ah]	 ; get cluster number from directory entry
+    133						     clc
+    134						     je	     ffDone
+    135
+    136						     add     di, 20h		 ; go to next directory	entry
+    137						     cmp     byte ptr es:[di], 0     ; if the first byte of the	name is	0,
+    138						     jnz     next_entry		     ; there is	no more	files in the directory
+    139
+    140						     stc
+    141				     ffDone:
+    142						     ENDM
+    143
+    144				     ;	     GETDRIVEPARMS:  Calculate start of	some disk areas.
+    145
+    146				     GETDRIVEPARMS   MACRO
+    147						     mov     si, word ptr nHidden
+    148						     mov     di, word ptr nHidden+2
+    149						     add     si, word ptr resSectors
+    150						     adc     di, 0		     ; DI:SI = first FAT sector
+    151
+    152						     mov     word ptr fat_start, si
+    153						     mov     word ptr fat_start+2, di
+    154
+    155						     mov     al, nFats
+    156						     xor     ah, ah
+    157						     mul     word ptr sectPerFat     ; DX:AX = total number of FAT sectors
+    158
+    159						     add     si, ax
+    160						     adc     di, dx		     ; DI:SI = first root directory sector
+    161						     mov     word ptr root_dir_start, si
+    162						     mov     word ptr root_dir_start+2,	di
+    163
+    164						     ; Calculate how many sectors the root directory occupies.
+    165						     mov     bx, bytesPerSector
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:39	    Page 4
+boot.ASM
+
+
+
+    166						     mov     cl, 5		     ; divide BX by 32
+    167						     shr     bx, cl		     ; BX = directory entries per sector
+    168
+    169						     mov     ax, nRootDir
+    170						     xor     dx, dx
+    171						     div     bx
+    172
+    173						     mov     nRootDir, ax	     ; AX = sectors per	root directory
+    174
+    175						     add     si, ax
+    176						     adc     di, 0		     ; DI:SI = first data sector
+    177
+    178						     mov     data_start, si
+    179						     mov     data_start+2, di
+    180						     ENDM
+    181
+    182				     ;	     GETFATCHAIN:
+    183				     ;
+    184				     ;	     Reads the FAT chain and stores it in a temporary buffer in	the first
+    185				     ;	     64	kb.  The FAT chain is stored an	array of 16-bit	cluster	numbers,
+    186				     ;	     ending with 0.
+    187				     ;
+    188				     ;	     The file must fit in conventional memory, so it can't be larger than
+    189				     ;	     640 kb. The sector	size must be at	least 512 bytes, so the	FAT chain
+    190				     ;	     can't be larger than around 3 kb.
+    191				     ;
+    192				     ;	     Call with:	     AX	= first	cluster	in chain
+    193				     ;
+    194				     ;	     Returns:	     CF	clear on success, set on error
+    195
+    196				     GETFATCHAIN     MACRO
+    197						     push    ax			     ; store first cluster number
+    198
+    199						     ; Load the	complete FAT into memory. The FAT can't	be larger
+    200						     ; than 128	kb, so it should fit in	the temporary buffer.
+    201
+    202						     mov     es, tempbuf
+    203						     xor     bx, bx
+    204						     mov     di, sectPerFat
+    205						     mov     ax, word ptr fat_start
+    206						     mov     dx, word ptr fat_start+2
+    207						     call    readDisk
+    208						     pop     ax			     ; restore first cluster number
+    209						     jc	     boot_error
+    210
+    211						     ; Set ES:DI to the	temporary storage for the FAT chain.
+    212						     push    ds
+    213						     push    es
+    214						     pop     ds
+    215						     pop     es
+    216						     mov     di, FATBUF
+    217
+    218				     next_clust:     stosw			     ; store cluster number
+    219						     mov     si, ax		     ; SI = cluster number
+    220						     cmp     byte ptr extBoot, 29h
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:39	    Page 5
+boot.ASM
+
+
+
+    221						     jne     fat_12
+    222						     cmp     byte ptr filesys[4], '6'  ; check for FAT-16 system
+    223						     je	     fat_16
+    224
+    225						     ; This is a FAT-12	disk.
+    226
+    227				     fat_12:	     add     si, si	     ; multiply	cluster	number by 3...
+    228						     add     si, ax
+    229						     shr     si, 1	     ; ...and divide by	2
+    230						     lodsw
+    231
+    232						     ; If the cluster number was even, the cluster value is now	in
+    233						     ; bits 0-11 of AX.	If the cluster number was odd, the cluster
+    234						     ; value is	in bits	4-15, and must be shifted right	4 bits.	If
+    235						     ; the number was odd, CF was set in the last shift	instruction.
+    236
+    237						     jnc     fat_even
+    238						     mov     cl, 4
+    239						     shr     ax, cl	     ; shift the cluster number
+    240
+    241				     fat_even:	     and     ah, 0fh	     ; mask off	the highest 4 bits
+    242						     cmp     ax, 0fffh	     ; check for EOF
+    243						     jmp     short next_test
+    244
+    245						     ; This is a FAT-16	disk. The maximal size of a 16-bit FAT
+    246						     ; is 128 kb, so it	may not	fit within a single 64 kb segment.
+    247
+    248				     fat_16:	     mov     dx, tempbuf
+    249						     add     si, si	     ; multiply	cluster	number by two
+    250						     jnc     first_half	     ; if overflow...
+    251						     add     dh, 10h	     ; ...add 64 kb to segment value
+    252
+    253				     first_half:     mov     ds, dx	     ; DS:SI = pointer to next cluster
+    254						     lodsw		     ; AX = next cluster
+    255
+    256						     cmp     ax, 0fff8h	     ; >= FFF8 = 16-bit	EOF
+    257				     next_test:	     jb	     next_clust	     ; continue	if not EOF
+    258
+    259				     finished:	     ; Mark end	of FAT chain with 0, so	we have	a single
+    260						     ; EOF marker for both FAT-12 and FAT-16 systems.
+    261
+    262						     xor     ax, ax
+    263						     stosw
+    264				     fatError:
+    265						     ENDM
+    266
+    267				     ;	     loadFile: Loads the file into memory, one cluster at a time.
+    268
+    269				     loadFile	     MACRO
+    270						     mov     es, tempbuf     ; set ES:BX to load address
+    271						     xor     bx, bx
+    272
+    273						     mov     si, FATBUF	     ; set DS:SI to the	FAT chain
+    274						     push    cs
+    275						     pop     ds
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:39	    Page 6
+boot.ASM
+
+
+
+    276
+    277				     next_cluster:   lodsw			     ; AX = next cluster to read
+    278						     or	     ax, ax		     ; if EOF...
+    279						     je	     boot_success	     ; ...boot was successful
+    280
+    281						     dec     ax			     ; cluster numbers start with 2
+    282						     dec     ax
+    283
+    284						     mov     di, word ptr sectPerCluster
+    285						     and     di, 0ffh		     ; DI = sectors per	cluster
+    286						     mul     di
+    287						     add     ax, data_start
+    288						     adc     dx, data_start+2	     ; DX:AX = first sector to read
+    289						     call    readDisk
+    290						     jnc     next_cluster
+    291
+    292						     ENDM
+    293
+    294						     org     BASE+3eh
+    295
+    296	      =	[bp+3eh]	     tempbuf	     equ     [bp+3eh]
+    297	003E  2000		     load_seg	     dw	     LOADSEG
+    298
+    299	0040  FA		     real_start:     cli
+    300	0041  FC				     cld
+    301	0042  8C C8				     mov     ax, cs
+    302	0044  8E D0				     mov     ss, ax	     ; initialize stack
+    303	0046  BD 7C00				     mov     bp, 7c00h
+    304	0049  8D 66 E0				     lea     sp, [bp-20h]
+    305	004C  FB				     sti
+    306
+    307	004D  8E C0				     mov     es, ax
+    308	004F  8E D8				     mov     ds, ax
+    309	0051  88 56 24				     mov     drive, dl	     ; BIOS passes drive number	in DL
+    310
+    311						     GETDRIVEPARMS
+1   312	0054  8B 76 1C				     mov     si, word ptr nHidden
+1   313	0057  8B 7E 1E				     mov     di, word ptr nHidden+2
+1   314	005A  03 76 0E				     add     si, word ptr resSectors
+1   315	005D  83 D7 00				     adc     di, 0		     ; DI:SI = first FAT sector
+1   316	0060  89 76 FC				     mov     word ptr fat_start, si
+1   317	0063  89 7E FE				     mov     word ptr fat_start+2, di
+1   318	0066  8A 46 10				     mov     al, nFats
+1   319	0069  32 E4				     xor     ah, ah
+1   320	006B  F7 66 16				     mul     word ptr sectPerFat     ; DX:AX = total number of FAT sectors
+1   321	006E  03 F0				     add     si, ax
+1   322	0070  13 FA				     adc     di, dx		     ; DI:SI = first root directory sector
+1   323	0072  89 76 F8				     mov     word ptr root_dir_start, si
+1   324	0075  89 7E FA				     mov     word ptr root_dir_start+2,	di
+1   325	0078  8B 5E 0B				     mov     bx, bytesPerSector
+1   326	007B  B1 05				     mov     cl, 5		     ; divide BX by 32
+1   327	007D  D3 EB				     shr     bx, cl		     ; BX = directory entries per sector
+1   328	007F  8B 46 11				     mov     ax, nRootDir
+1   329	0082  33 D2				     xor     dx, dx
+1   330	0084  F7 F3				     div     bx
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:39	    Page 7
+boot.ASM
+
+
+
+1   331	0086  89 46 11				     mov     nRootDir, ax	     ; AX = sectors per	root directory
+1   332	0089  03 F0				     add     si, ax
+1   333	008B  83 D7 00				     adc     di, 0		     ; DI:SI = first data sector
+1   334	008E  89 76 F4				     mov     data_start, si
+1   335	0091  89 7E F6				     mov     data_start+2, di
+    336
+    337						     FINDFILE		     ; locate file in root directory
+1   338	0094  8B 46 F8				     mov     ax, word ptr root_dir_start
+1   339	0097  8B 56 FA				     mov     dx, word ptr root_dir_start+2
+1   340	009A  8B 7E 11				     mov     di, nRootDir
+1   341	009D  33 DB				     xor     bx, bx
+1   342	009F  8E 46 3E				     mov     es, tempbuf
+1   343	00A2  E8 00B9				     call    readDisk
+1   344	00A5  72 1D				     jc	     ffDone
+1   345	00A7  33 FF				     xor     di, di
+1   346	00A9  B9 000B		     next_entry:     mov     cx, 11
+1   347	00AC  BE 7DEEr				     mov     si, offset	filename+7c00h
+1   348	00AF  57				     push    di
+1   349	00B0  F3> A6				     repe    cmpsb
+1   350	00B2  5F				     pop     di
+1   351	00B3  26: 8B 45	1A			     mov     ax, es:[di][1ah]	 ; get cluster number from directory entry
+1   352	00B7  F8				     clc
+1   353	00B8  74 0A				     je	     ffDone
+1   354	00BA  83 C7 20				     add     di, 20h		 ; go to next directory	entry
+1   355	00BD  26: 80 3D	00			     cmp     byte ptr es:[di], 0     ; if the first byte of the	name is	0,
+1   356	00C1  75 E6				     jnz     next_entry		     ; there is	no more	files in the directory
+1   357	00C3  F9				     stc
+1   358	00C4			     ffDone:
+    359	00C4  72 7A				     jc	     boot_error	     ; fail if not found
+    360
+    361						     GETFATCHAIN	     ; read FAT	chain
+1   362	00C6  50				     push    ax			     ; store first cluster number
+1   363	00C7  8E 46 3E				     mov     es, tempbuf
+1   364	00CA  33 DB				     xor     bx, bx
+1   365	00CC  8B 7E 16				     mov     di, sectPerFat
+1   366	00CF  8B 46 FC				     mov     ax, word ptr fat_start
+1   367	00D2  8B 56 FE				     mov     dx, word ptr fat_start+2
+1   368	00D5  E8 0086				     call    readDisk
+1   369	00D8  58				     pop     ax			     ; restore first cluster number
+1   370	00D9  72 65				     jc	     boot_error
+1   371	00DB  1E				     push    ds
+1   372	00DC  06				     push    es
+1   373	00DD  1F				     pop     ds
+1   374	00DE  07				     pop     es
+1   375	00DF  BF 4000				     mov     di, FATBUF
+1   376	00E2  AB		     next_clust:     stosw			     ; store cluster number
+1   377	00E3  8B F0				     mov     si, ax		     ; SI = cluster number
+1   378	00E5  80 7E 26 29			     cmp     byte ptr extBoot, 29h
+1   379	00E9  75 06				     jne     fat_12
+1   380	00EB  80 7E 3A 36			     cmp     byte ptr filesys[4], '6'  ; check for FAT-16 system
+1   381	00EF  74 15				     je	     fat_16
+1   382	00F1  03 F6		     fat_12:	     add     si, si	     ; multiply	cluster	number by 3...
+1   383	00F3  03 F0				     add     si, ax
+1   384	00F5  D1 EE				     shr     si, 1	     ; ...and divide by	2
+1   385	00F7  AD				     lodsw
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:39	    Page 8
+boot.ASM
+
+
+
+1   386	00F8  73 04				     jnc     fat_even
+1   387	00FA  B1 04				     mov     cl, 4
+1   388	00FC  D3 E8				     shr     ax, cl	     ; shift the cluster number
+1   389	00FE  80 E4 0F		     fat_even:	     and     ah, 0fh	     ; mask off	the highest 4 bits
+1   390	0101  3D 0FFF				     cmp     ax, 0fffh	     ; check for EOF
+1   391	0104  EB 10				     jmp     short next_test
+1   392	0106  8B 56 3E		     fat_16:	     mov     dx, tempbuf
+1   393	0109  03 F6				     add     si, si	     ; multiply	cluster	number by two
+1   394	010B  73 03				     jnc     first_half	     ; if overflow...
+1   395	010D  80 C6 10				     add     dh, 10h	     ; ...add 64 kb to segment value
+1   396	0110  8E DA		     first_half:     mov     ds, dx	     ; DS:SI = pointer to next cluster
+1   397	0112  AD				     lodsw		     ; AX = next cluster
+1   398	0113  3D FFF8				     cmp     ax, 0fff8h	     ; >= FFF8 = 16-bit	EOF
+1   399	0116  72 CA		     next_test:	     jb	     next_clust	     ; continue	if not EOF
+1   400	0118			     finished:	     ; Mark end	of FAT chain with 0, so	we have	a single
+1   401	0118  33 C0				     xor     ax, ax
+1   402	011A  AB				     stosw
+1   403	011B			     fatError:
+    404						     LOADFILE		     ; load file (jumps	to boot_sucess if successful)
+1   405	011B  8E 46 3E				     mov     es, tempbuf     ; set ES:BX to load address
+1   406	011E  33 DB				     xor     bx, bx
+1   407	0120  BE 4000				     mov     si, FATBUF	     ; set DS:SI to the	FAT chain
+1   408	0123  0E				     push    cs
+1   409	0124  1F				     pop     ds
+1   410	0125  AD		     next_cluster:   lodsw			     ; AX = next cluster to read
+1   411	0126  0B C0				     or	     ax, ax		     ; if EOF...
+1   412	0128  74 2C				     je	     boot_success	     ; ...boot was successful
+1   413	012A  48				     dec     ax			     ; cluster numbers start with 2
+1   414	012B  48				     dec     ax
+1   415	012C  8B 7E 0D				     mov     di, word ptr sectPerCluster
+1   416	012F  81 E7 00FF			     and     di, 0ffh		     ; DI = sectors per	cluster
+1   417	0133  F7 E7				     mul     di
+1   418	0135  03 46 F4				     add     ax, data_start
+1   419	0138  13 56 F6				     adc     dx, data_start+2	     ; DX:AX = first sector to read
+1   420	013B  E8 0020				     call    readDisk
+1   421	013E  73 E5				     jnc     next_cluster
+    422
+    423	0140  B9 000A 90	     boot_error:     mov     cx, ERRMSGLEN
+    424	0144  BE 7DE4r				     mov     si, offset	errmsg+7c00h
+    425
+    426	0147  AC		     next_char:	     lodsb		     ; print error message
+    427	0148  B4 0E				     mov     ah, 0eh
+    428	014A  32 FF				     xor     bh, bh
+    429	014C  CD 10				     int     10h
+    430	014E  E2 F7				     loop    next_char
+    431
+    432	0150  32 E4				     xor     ah, ah
+    433	0152  CD 16				     int     16h	     ; wait for	keystroke
+    434	0154  CD 19				     int     19h	     ; invoke bootstrap	loader
+    435
+    436	0156  8A 56 24		     boot_success:   mov     dl, drive
+    437
+    438	0159  EA				     db	     0eah	     ; far jump	to LOADSEG:0000
+    439	015A  0000				     dw	     0
+    440	015C  2000				     dw	     LOADSEG
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:39	    Page 9
+boot.ASM
+
+
+
+    441
+    442
+    443				     ;	     readDisk:	     Reads a number of sectors into memory.
+    444				     ;
+    445				     ;	     Call with:	     DX:AX = 32-bit DOS	sector number
+    446				     ;			     DI	= number of sectors to read
+    447				     ;			     ES:BX = destination buffer
+    448				     ;			     ES	must be	64k aligned (1000h, 2000h etc).
+    449				     ;
+    450				     ;	     Returns:	     CF	set on error
+    451				     ;			     ES:BX points one byte after the last byte read.
+    452
+    453	015E			     readDisk	     proc
+    454	015E  56				     push    si
+    455	015F  52		     read_next:	     push    dx
+    456	0160  50				     push    ax
+    457
+    458						     ;
+    459						     ; translate sector	number to BIOS parameters
+    460						     ;
+    461
+    462						     ;
+    463						     ; abs = sector			     offset in track
+    464						     ;	   + head * sectPerTrack	     offset in cylinder
+    465						     ;	   + track * sectPerTrack * nHeads   offset in platter
+    466						     ;
+    467						     ; t1     =	abs  /	sectPerTrack	     (ax has t1)
+    468						     ; sector =	abs mod	sectPerTrack	     (cx has sector)
+    469						     ;
+    470	0161  F7 76 18				     div     word ptr sectPerTrack
+    471	0164  8B CA				     mov     cx, dx
+    472
+    473						     ;
+    474						     ; t1   = head + track * nHeads
+    475						     ;
+    476						     ; track = t1  /  nHeads		     (ax has track)
+    477						     ; head  = t1 mod nHeads		     (dl has head)
+    478						     ;
+    479	0166  33 D2				     xor     dx, dx
+    480	0168  F7 76 1A				     div     word ptr nHeads
+    481
+    482						     ; the following manipulations are necessary in order to
+    483						     ; properly	place parameters into registers.
+    484						     ; ch = cylinder number low	8 bits
+    485						     ; cl = 7-6: cylinder high two bits
+    486						     ;	    5-0: sector
+    487	016B  8A F2				     mov     dh, dl		     ; save head into dh for bios
+    488	016D  D0 CC				     ror     ah, 1		     ; move track high bits into
+    489	016F  D0 CC				     ror     ah, 1		     ; bits 7-6	(assumes top = 0)
+    490	0171  86 C4				     xchg    al, ah		     ; swap for	later
+    491	0173  8A 56 18				     mov     dl, byte ptr sectPerTrack
+    492	0176  2A D1				     sub     dl, cl
+    493	0178  FE C1				     inc     cl			     ; sector offset from 1
+    494	017A  0B C8				     or	     cx, ax		     ; merge cylinder into sector
+    495	017C  8A C2				     mov     al, dl		     ; al has #	of sectors left
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:39	    Page 10
+boot.ASM
+
+
+
+    496
+    497						     ; Calculate how many sectors can be transfered in this read
+    498						     ; due to dma boundary conditions.
+    499	017E  52				     push    dx
+    500
+    501	017F  8B F7				     mov     si, di		     ; temp register save
+    502						     ; this computes remaining bytes because of	modulo 65536
+    503						     ; nature of dma boundary condition
+    504	0181  8B C3				     mov     ax, bx		     ; get offset pointer
+    505	0183  F7 D8				     neg     ax			     ; and convert to bytes
+    506	0185  74 0B				     jz	     ax_min_1		     ; started at seg:0, skip ahead
+    507
+    508	0187  33 D2				     xor     dx, dx		     ; convert to sectors
+    509	0189  F7 76 0B				     div     word ptr bytesPerSector
+    510
+    511	018C  3B C7				     cmp     ax, di		     ; check remainder vs. asked
+    512	018E  72 02				     jb	     ax_min_1		     ; less, skip ahead
+    513	0190  8B F0				     mov     si, ax		     ; transfer	only what we can
+    514
+    515	0192  5A		     ax_min_1:	     pop     dx
+    516
+    517						     ; Check that request sectors do not exceed	track boundary
+    518	0193  8B 76 18				     mov     si, sectPerTrack
+    519	0196  46				     inc     si
+    520	0197  8B C1				     mov     ax, cx		     ; get the sector/cyl byte
+    521	0199  25 003F				     and     ax, 03fh		     ; and mask	out sector
+    522	019C  2B F0				     sub     si, ax		     ; si has how many we can read
+    523	019E  8B C7				     mov     ax, di
+    524	01A0  3B F7				     cmp     si, di		     ; see if asked <= available
+    525	01A2  7D 02				     jge     ax_min_2
+    526	01A4  8B C6				     mov     ax, si		     ; get what	can be xfered
+    527
+    528	01A6  BE 0005		     ax_min_2:	     mov     si, RETRYCOUNT
+    529	01A9  B4 02				     mov     ah, 2
+    530	01AB  8A 56 24				     mov     dl, drive
+    531
+    532	01AE  50		     retry:	     push    ax
+    533	01AF  CD 13				     int     13h
+    534	01B1  58				     pop     ax
+    535	01B2  73 10				     jnc     read_ok
+    536	01B4  50				     push    ax
+    537	01B5  33 C0				     xor     ax, ax	     ; reset the drive
+    538	01B7  CD 13				     int     13h
+    539	01B9  58				     pop     ax
+    540	01BA  4E				     dec     si
+    541	01BB  75 F1				     jnz     retry
+    542	01BD  F9				     stc
+    543	01BE  58				     pop     ax
+    544	01BF  5A				     pop     dx
+    545	01C0  5E				     pop     si
+    546	01C1  C3				     ret
+    547
+    548	01C2  EB 9B		     read_next_jmp:  jmp     short read_next
+    549	01C4  32 E4		     read_ok:	     xor     ah, ah
+    550	01C6  8B F0				     mov     si, ax		     ; AX = SI = number	of sectors read
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:39	    Page 11
+boot.ASM
+
+
+
+    551	01C8  F7 66 0B				     mul     word ptr bytesPerSector ; AX = number of bytes read
+    552	01CB  03 D8				     add     bx, ax		     ; add number of bytes read	to BX
+    553	01CD  73 07				     jnc     no_incr_es		     ; if overflow...
+    554
+    555	01CF  8C C0				     mov     ax, es
+    556	01D1  80 C4 10				     add     ah, 10h		     ; ...add 1000h to ES
+    557	01D4  8E C0				     mov     es, ax
+    558
+    559	01D6  58		     no_incr_es:     pop     ax
+    560	01D7  5A				     pop     dx			     ; DX:AX = last sector number
+    561
+    562	01D8  03 C6				     add     ax, si
+    563	01DA  83 D2 00				     adc     dx, 0		     ; DX:AX = next sector to read
+    564	01DD  2B FE				     sub     di, si		     ; if there	is anything left to read,
+    565	01DF  7F E1				     jg	     read_next_jmp	     ; continue
+    566
+    567	01E1  F8				     clc
+    568	01E2  5E				     pop     si
+    569	01E3  C3				     ret
+    570	01E4			     readDisk	     endp
+    571
+    572	01E4  42 6F 6F 74 20 65	72+  errmsg	     db	     "Boot error"
+    573	      72 6F 72
+    574	      =000A		     ERRMSGLEN	     equ     $ - errmsg
+    575
+    576
+    577	01EE  49 50 4C 20 20 20	20+  filename	     db	     "IPL     SYS"
+    578	      20 53 59 53
+    579
+    580						     org     BASE+01feh
+    581	01FE  AA55		     sign	     dw	     0aa55h
+    582
+    583	0200			     TEXT	     ENDS
+    584						     end
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:39	    Page 12
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "12/06/98"
+??FILENAME			  Text	 "boot	  "
+??TIME				  Text	 "09:46:39"
+??VERSION			  Number 030A
+@CPU				  Text	 0101H
+@CURSEG				  Text	 TEXT
+@FILENAME			  Text	 BOOT
+@WORDSIZE			  Text	 2
+AX_MIN_1			  Near	 TEXT:0192
+AX_MIN_2			  Near	 TEXT:01A6
+BASE				  Number 0000
+BOOT_ERROR			  Near	 TEXT:0140
+BOOT_SUCCESS			  Near	 TEXT:0156
+BYTESPERSECTOR			  Text	 [bp+0bh]
+DATA_START			  Text	 [bp-12]
+DRIVE				  Text	 [bp+24h]
+ENTRY				  Near	 TEXT:0000
+ERRMSG				  Byte	 TEXT:01E4
+ERRMSGLEN			  Number 000A
+EXTBOOT				  Text	 [bp+26h]
+FATBUF				  Number 4000
+FATERROR			  Near	 TEXT:011B
+FAT_12				  Near	 TEXT:00F1
+FAT_16				  Near	 TEXT:0106
+FAT_EVEN			  Near	 TEXT:00FE
+FAT_START			  Text	 [bp-4]
+FFDONE				  Near	 TEXT:00C4
+FILENAME			  Byte	 TEXT:01EE
+FILESYS				  Text	 [bp+36h]
+FINISHED			  Near	 TEXT:0118
+FIRST_HALF			  Near	 TEXT:0110
+LOADSEG				  Number 2000
+LOAD_SEG			  Word	 TEXT:003E
+MID				  Text	 [bp+15h]
+NEXT_CHAR			  Near	 TEXT:0147
+NEXT_CLUST			  Near	 TEXT:00E2
+NEXT_CLUSTER			  Near	 TEXT:0125
+NEXT_ENTRY			  Near	 TEXT:00A9
+NEXT_TEST			  Near	 TEXT:0116
+NFATS				  Text	 [bp+10h]
+NHEADS				  Text	 [bp+1ah]
+NHIDDEN				  Text	 [bp+1ch]
+NO_INCR_ES			  Near	 TEXT:01D6
+NROOTDIR			  Text	 [bp+11h]
+NSECTORHUGE			  Text	 [bp+20h]
+NSECTORS			  Text	 [bp+13h]
+OEM				  Text	 [bp+3]
+READDISK			  Near	 TEXT:015E
+READ_NEXT			  Near	 TEXT:015F
+READ_NEXT_JMP			  Near	 TEXT:01C2
+READ_OK				  Near	 TEXT:01C4
+REAL_START			  Near	 TEXT:0040
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:39	    Page 13
+Symbol Table
+
+
+
+RESSECTORS			  Text	 [bp+0eh]
+RETRY				  Near	 TEXT:01AE
+RETRYCOUNT			  Number 0005
+ROOT_DIR_START			  Text	 [bp-8]
+SECTPERCLUSTER			  Text	 [bp+0dh]
+SECTPERFAT			  Text	 [bp+16h]
+SECTPERTRACK			  Text	 [bp+18h]
+SIGN				  Word	 TEXT:01FE
+TEMPBUF				  Text	 [bp+3eh]
+VOLID				  Text	 [bp+27h]
+VOLLABEL			  Text	 [bp+2bh]
+
+Macro Name
+
+FINDFILE
+GETDRIVEPARMS
+GETFATCHAIN
+LOADFILE
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+TEXT				  16  0200 Word	  Public  TEXT
+

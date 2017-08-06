@@ -1,0 +1,889 @@
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 1
+io.ASM
+
+
+
+      1				     ;
+      2				     ; File:
+      3				     ;				   io.asm
+      4				     ; Description:
+      5				     ;			     DOS-C I/O Subsystem
+      6				     ;
+      7				     ;			     Copyright (c) 1998
+      8				     ;			     Pasquale J. Villani
+      9				     ;			     All Rights	Reserved
+     10				     ;
+     11				     ; This file is part of DOS-C.
+     12				     ;
+     13				     ; DOS-C is	free software; you can redistribute it and/or
+     14				     ; modify it under the terms of the	GNU General public License
+     15				     ; as published by the Free	Software Foundation; either version
+     16				     ; 2, or (at your option) any later	version.
+     17				     ;
+     18				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+     19				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+     20				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+     21				     ; the GNU General public License for more details.
+     22				     ;
+     23				     ; You should have received	a copy of the GNU General public
+     24				     ; License along with DOS-C; see the file COPYING.	If not,
+     25				     ; write to	the Free Software Foundation, 675 Mass Ave,
+     26				     ; Cambridge, MA 02139, USA.
+     27				     ;
+     28				     ; $Header$
+     29				     ;
+     30				     ; $Log$
+     31				     ; $EndLog$
+     32				     ;
+     33
+     34
+     35						     include segs.inc
+1    36				     ; File:
+1    37				     ;				 segs.inc
+1    38				     ; Description:
+1    39				     ;	   Segment definitions for the kernel
+1    40				     ;
+1    41				     ;			     Copyright (c) 1998
+1    42				     ;			     Pasquale J. Villani
+1    43				     ;			     All Rights	Reserved
+1    44				     ;
+1    45				     ; This file is part of DOS-C.
+1    46				     ;
+1    47				     ; DOS-C is	free software; you can redistribute it and/or
+1    48				     ; modify it under the terms of the	GNU General Public License
+1    49				     ; as published by the Free	Software Foundation; either version
+1    50				     ; 2, or (at your option) any later	version.
+1    51				     ;
+1    52				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+1    53				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+1    54				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+1    55				     ; the GNU General Public License for more details.
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 2
+io.ASM
+
+
+
+1    56				     ;
+1    57				     ; You should have received	a copy of the GNU General Public
+1    58				     ; License along with DOS-C; see the file COPYING.	If not,
+1    59				     ; write to	the Free Software Foundation, 675 Mass Ave,
+1    60				     ; Cambridge, MA 02139, USA.
+1    61				     ;
+1    62				     ; $Logfile:   C:/usr/patv/dos-c/src/kernel/segs.inv  $
+1    63				     ;
+1    64				     ; $Header:	  C:/usr/patv/dos-c/src/kernel/segs.inv	  1.0	06 Dec 1998  8:12:36   patv  $
+1    65				     ;
+1    66				     ; $Log:   C:/usr/patv/dos-c/src/kernel/segs.inv  $
+1    67				     ;
+1    68				     ;	  Rev 1.0   06 Dec 1998	 8:12:36   patv
+1    69				     ; Initial revision.
+1    70				     ; $EndLog
+1    71				     ;
+1    72
+1    73	0000			     _TEXT	     segment byte public 'CODE'
+1    74				     TGROUP	     group   _TEXT,_IO_TEXT,_IO_FIXED_DATA
+1    75				     DGROUP	     group   _FIXED_DATA,_DATA,_BSS,_BSSEND  ; small model
+1    76						     assume  cs:TGROUP,ds:DGROUP,ss:DGROUP
+1    77	0000			     _TEXT	     ends
+1    78
+1    79	0000			     _IO_TEXT	     segment byte public 'CODE'
+1    80	0000			     _IO_TEXT	     ends
+1    81
+1    82	0000			     _IO_FIXED_DATA  segment word public 'CODE'
+1    83	0000			     _IO_FIXED_DATA  ends
+1    84
+1    85	0000			     _FIXED_DATA     segment para public 'DATA'
+1    86	0000			     _FIXED_DATA     ends
+1    87
+1    88	0000			     _DATA	     segment word public 'DATA'
+1    89	0000			     _DATA	     ends
+1    90
+1    91	0000			     _BSS	     segment word public 'BSS'
+1    92	0000			     _BSS	     ends
+1    93
+1    94	0000			     _BSSEND	     segment byte public 'STACK'
+1    95	0000			     _BSSEND	     ends
+1    96
+1    97
+     98
+     99						     extrn   ConTable
+    100						     extrn   LptTable
+    101						     extrn   ComTable
+    102						     extrn   uPrtNo:byte
+    103						     extrn   CommonNdRdExit
+    104						     extrn   _NumFloppies:word
+    105						     extrn   blk_stk_top:byte
+    106						     extrn   clk_stk_top:byte
+    107						     extrn   _blk_driver:near
+    108						     extrn   _clk_driver:near
+    109
+    110				     ;---------------------------------------------------
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 3
+io.ASM
+
+
+
+    111				     ;
+    112				     ; Device entry points
+    113				     ;
+    114				     ; This really should be a struct and go into a request.inc	file
+    115				     ;
+    116	      =0000		     cmdlen  equ     0			     ; Length of this command
+    117	      =0001		     unit    equ     1			     ; Subunit Specified
+    118	      =0002		     cmd     equ     2			     ; Command Code
+    119	      =0003		     status  equ     3			     ; Status
+    120	      =000D		     media   equ     13			     ; Media Descriptor
+    121	      =000E		     trans   equ     14			     ; Transfer	Address
+    122	      =0012		     count   equ     18			     ; Count of	blocks or characters
+    123	      =0014		     start   equ     20			     ; First block to transfer
+    124	      =0016		     vid     equ     22			     ; Volume id pointer
+    125	      =001A		     huge    equ     26			     ; First block (32-bit) to transfer
+    126
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 4
+io.ASM
+
+
+
+    127				     ;
+    128				     ; The following is	the "array" of device driver headers for the internal
+    129				     ; devices.	 There is one header per device	including special aux: and prn:
+    130				     ; pseudo devices.	These psuedo devices are necessary for printer
+    131				     ; redirection, i.e., serial or parallel ports, and	com port aux selection.
+    132				     ;
+    133				     ; The devices are linked into each	other and terminate with a -1 next
+    134				     ; pointer.	 This saves some time on boot up and also allows us to throw all
+    135				     ; device initialization into a single io_init function that may be	placed
+    136				     ; into a discardable code segmemnt.
+    137				     ;
+    138	0000			     _IO_FIXED_DATA  segment word public 'CODE'
+    139						     assume cs:TGROUP
+    140
+    141						     ;
+    142						     ; The "CON" device
+    143						     ;
+    144						     ; This device is the standard console device used by
+    145						     ; DOS-C and kernel
+    146						     ;
+    147						     public  _con_dev
+    148	      =_IO_FIXED_DATA:0000   _con_dev	     equ     $
+    149	0000  00000012sr			     dd	     _prn_dev
+    150	0004  8013				     dw	     8013h	     ; con device (stdin & stdout)
+    151	0006  0000r				     dw	     offset GenStrategy
+    152	0008  000Br				     dw	     offset ConIntr
+    153	000A  43 4F 4E 20 20 20	20+		     db	     'CON     '
+    154	      20
+    155
+    156						     ;
+    157						     ; Generic prn device that can be redirected via mode
+    158						     ;
+    159						     public  _prn_dev
+    160	0012  00000024sr	     _prn_dev	     dd	     _aux_dev
+    161	0016  A040				     dw	     0A040h
+    162	0018  0000r				     dw	     offset GenStrategy
+    163	001A  0011r				     dw	     offset PrnIntr
+    164	001C  50 52 4E 20 20 20	20+		     db	     'PRN     '
+    165	      20
+    166
+    167						     ;
+    168						     ; Generic aux device that can be redirected via mode
+    169						     ;
+    170						     public  _aux_dev
+    171	0024  00000036sr	     _aux_dev	     dd	     _Lpt1Dev
+    172	0028  8000				     dw	     8000h
+    173	002A  0000r				     dw	     offset GenStrategy
+    174	002C  0037r				     dw	     offset AuxIntr
+    175	002E  41 55 58 20 20 20	20+		     db	     'AUX     '
+    176	      20
+    177
+    178						     ;
+    179						     ; Printer device drivers
+    180						     ;
+    181	0036  00000048sr	     _Lpt1Dev	     dd	     _Lpt2Dev
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 5
+io.ASM
+
+
+
+    182	003A  A040				     dw	     0A040h
+    183	003C  0000r				     dw	     offset GenStrategy
+    184	003E  0017r				     dw	     offset Lpt1Intr
+    185	0040  4C 50 54 31 20 20	20+		     db	     'LPT1    '
+    186	      20
+    187	0048  0000005Asr	     _Lpt2Dev	     dd	     _Lpt3Dev
+    188	004C  A040				     dw	     0A040h
+    189	004E  0000r				     dw	     offset GenStrategy
+    190	0050  001Fr				     dw	     offset Lpt2Intr
+    191	0052  4C 50 54 32 20 20	20+		     db	     'LPT2    '
+    192	      20
+    193	005A  0000006Csr	     _Lpt3Dev	     dd	     _Com1Dev
+    194	005E  A040				     dw	     0A040h
+    195	0060  0000r				     dw	     offset GenStrategy
+    196	0062  0027r				     dw	     offset Lpt3Intr
+    197	0064  4C 50 54 33 20 20	20+		     db	     'LPT3    '
+    198	      20
+    199
+    200						     ;
+    201						     ; Com device drivers
+    202						     ;
+    203	006C  0000007Esr	     _Com1Dev	     dd	     _Com2Dev
+    204	0070  8000				     dw	     8000h
+    205	0072  0000r				     dw	     offset GenStrategy
+    206	0074  0037r				     dw	     offset AuxIntr
+    207	0076  43 4F 4D 31 20 20	20+		     db	     'COM1    '
+    208	      20
+    209	007E  00000090sr	     _Com2Dev	     dd	     _Com3Dev
+    210	0082  8000				     dw	     8000h
+    211	0084  0000r				     dw	     offset GenStrategy
+    212	0086  003Dr				     dw	     offset Com2Intr
+    213	0088  43 4F 4D 32 20 20	20+		     db	     'COM2    '
+    214	      20
+    215	0090  000000A2sr	     _Com3Dev	     dd	     _Com4Dev
+    216	0094  8000				     dw	     8000h
+    217	0096  0000r				     dw	     offset GenStrategy
+    218	0098  0043r				     dw	     offset Com3Intr
+    219	009A  43 4F 4D 33 20 20	20+		     db	     'COM3    '
+    220	      20
+    221	00A2  000000B4sr	     _Com4Dev	     dd	     _clk_dev
+    222	00A6  8000				     dw	     8000h
+    223	00A8  0000r				     dw	     offset GenStrategy
+    224	00AA  0049r				     dw	     offset Com4Intr
+    225	00AC  43 4F 4D 34 20 20	20+		     db	     'COM4    '
+    226	      20
+    227
+    228						     ;
+    229						     ; Header for clock	device
+    230						     ;
+    231						     public  _clk_dev
+    232	      =_IO_FIXED_DATA:00B4   _clk_dev	     equ     $
+    233	00B4  000000C6sr			     dd	     _blk_dev
+    234	00B8  8004				     dw	     8004h	     ; clock device
+    235	00BA  0000r				     dw	     offset GenStrategy
+    236	00BC  013Ar				     dw	     offset clk_entry
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 6
+io.ASM
+
+
+
+    237	00BE  43 4C 4F 43 4B 24	20+		     db	     'CLOCK$  '
+    238	      20
+    239
+    240						     ;
+    241						     ; Header for device
+    242						     ;
+    243						     public  _blk_dev
+    244	      =_IO_FIXED_DATA:00C6   _blk_dev	     equ     $
+    245	00C6  FFFFFFFF				     dd	     -1
+    246	00CA  0000				     dw	     0000h	     ; block device
+    247	00CC  0000r				     dw	     offset GenStrategy
+    248	00CE  00EEr				     dw	     offset blk_entry
+    249	00D0  04				     db	     4
+    250	00D1  00 00 00 00 00 00	00		     db	     0,0,0,0,0,0,0
+    251
+    252	00D8			     _IO_FIXED_DATA  ends
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 7
+io.ASM
+
+
+
+    253
+    254
+    255				     ;
+    256				     ; Temporary table until next release
+    257				     ;
+    258	00D8			     _IO_FIXED_DATA  segment word public 'CODE'
+    259						     assume cs:TGROUP
+    260	00D8  00		     DiskTable	     db	     0
+    261	00D9			     _IO_FIXED_DATA  ends
+    262
+    263
+    264				     ;
+    265				     ; Local storage
+    266				     ;
+    267
+    268	0000			     _BSS	     segment word public 'BSS'
+    269						     public  _ReqPktPtr
+    270	0000  00000000		     _ReqPktPtr	     dd	     (?)
+    271	0004  0000		     uUnitNumber     dw	     (?)
+    272	0006  0000		     blk_dos_stk     dw	     (?)
+    273	0008  0000		     blk_dos_seg     dw	     (?)
+    274	000A  0000		     clk_dos_stk     dw	     (?)
+    275	000C  0000		     clk_dos_seg     dw	     (?)
+    276	000E			     _BSS	     ends
+    277
+    278	0000			     _IO_TEXT	     segment byte public 'CODE'
+    279						     assume cs:TGROUP
+    280
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 8
+io.ASM
+
+
+
+    281				     ;
+    282				     ; Name:
+    283				     ;	     GenStrategy
+    284				     ;
+    285				     ; Function:
+    286				     ;	     Store the pointer to the request packet passed in es:bx
+    287				     ;
+    288				     ; Description:
+    289				     ;	     Generic strategy routine.	Unlike the original multitasking versions,
+    290				     ;	     this version assumes that no more thank one device	driver is active
+    291				     ;	     at	any time.  The request is stored into memory in	the one	and only
+    292				     ;	     location available	for that purpose.
+    293				     ;
+    294	0000			     GenStrategy     proc    far
+    295	0000  2E: 89 1E	0000r			     mov     word ptr cs:_ReqPktPtr,bx
+    296	0005  2E: 8C 06	0002r			     mov     word ptr cs:_ReqPktPtr+2,es
+    297	000A  CB				     ret
+    298	000B			     GenStrategy     endp
+    299
+    300
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 9
+io.ASM
+
+
+
+    301				     ;
+    302				     ; Name:
+    303				     ;	     XXXXIntr
+    304				     ;
+    305				     ; Function:
+    306				     ;	     Individual	Interrupt routines for each device driver
+    307				     ;
+    308				     ; Description:
+    309				     ;	     This is actually a	single routine with entry points for each device.
+    310				     ;	     The name used for the entry point is the device name with Intr
+    311				     ;	     appended to it.
+    312				     ;
+    313				     ;	     Funtionally, each device driver has an entry and an associated
+    314				     ;	     table.  The table is a structure that consists of a control byte
+    315				     ;	     followed by an array of pointers to C functions or	assembly
+    316				     ;	     subroutines that implement	the individual device driver functions.
+    317				     ;	     This allows the usage of common error dummy filler	code to	be used.
+    318				     ;	     It	also allows standardization of the calling procedure for these
+    319				     ;	     internal device driver functions.
+    320				     ;
+    321				     ;	     Assembler call/return convention:
+    322				     ;	     Each driver function is entered by	a jump into the	function and
+    323				     ;	     exits by a	jump to	the appropriate	success	or error exit routine.
+    324				     ;	     This speeds up the	call and return	and helps to minimize the stack
+    325				     ;	     useage.  The contents of the request packet are passed to each
+    326				     ;	     routine in	registers as follows:
+    327				     ;
+    328				     ;		   Register  Function		     Description
+    329				     ;		   --------  --------		     -----------
+    330				     ;		     al	     unit		     Subunit Specified
+    331				     ;		     ah	     media		     Media Descriptor
+    332				     ;		     cx	     count		     Count of blocks or	characters
+    333				     ;		     dx	     start		     First block to transfer
+    334				     ;		     es:di   trans		     Transfer Address
+    335				     ;		     ds:bx   reqptr		     Request pointer
+    336				     ;		     cs	     kernel code segment
+    337				     ;		     ds	     kernel data segment
+    338				     ;
+    339				     ;	     The exit routines generally set the status	based on the individual
+    340				     ;	     routine.  For example, _IOSuccess will clear the count where
+    341				     ;	     _IOErrCnt will subtract the remaining amount in cx	from the original
+    342				     ;	     count.  See each utility routine for expectations.
+    343				     ;
+    344				     ;	     C call/return convention:
+    345				     ;	     The C calling convention simply sets up the C stack and passes the
+    346				     ;	     request packet pointer as a far pointer to	the function.  Although
+    347				     ;	     the utility routine names are such	that they are accesible	from the
+    348				     ;	     C name space, they	are cannot used.  Instead, the common interrupt
+    349				     ;	     code expects a return status to set in the	request	packet.	 It is up
+    350				     ;	     to	the device driver function to set the appropriate fields such as
+    351				     ;	     count when	an error occurs.
+    352				     ;
+    353				     ;	     How to differntiate between the two calling conventions:
+    354				     ;	     This code is entirely table driven.  The table is a structure that
+    355				     ;	     is	generally in the _IO_FIXED_DATA	segment.  It consists of a flag
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 10
+io.ASM
+
+
+
+    356				     ;	     byte followed by short pointers to	the driver functions.  Selecting
+    357				     ;	     a driver type is accomplished by setting the type bit in the flag
+    358				     ;	     (see below).
+    359				     ;
+    360				     ;	       7   6   5   4   3   2   1   0
+    361				     ;	     +---+---+---+---+---+---+---+---+
+    362				     ;	     |	 |   |	 |   |	 |   |	 |   |
+    363				     ;	     +---+---+---+---+---+---+---+---+
+    364				     ;	       | |	 |		     |---    Number of table entries
+    365				     ;	       | |	 +-------------------+
+    366				     ;	       | |	 |-----------------------    Reserved
+    367				     ;	       | +-------+
+    368				     ;	       +---------------------------------    type bit (1 == C /	0 == asm)
+    369				     ;
+    370	000B			     ConIntr:
+    371	000B  56				     push    si
+    372	000C  BE 0000e				     mov     si,offset TGROUP:ConTable
+    373	000F  EB 47				     jmp     short CharIntrEntry
+    374
+    375	0011			     PrnIntr:
+    376	0011  56				     push    si
+    377	0012  50				     push    ax
+    378	0013  33 C0				     xor     ax,ax
+    379	0015  EB 16				     jmp     short LptCmnIntr
+    380
+    381	0017			     Lpt1Intr:
+    382	0017  56				     push    si
+    383	0018  50				     push    ax
+    384	0019  32 C0				     xor     al,al
+    385	001B  B4 01				     mov     ah,1
+    386	001D  EB 0E				     jmp     short LptCmnIntr
+    387
+    388	001F			     Lpt2Intr:
+    389	001F  56				     push    si
+    390	0020  50				     push    ax
+    391	0021  B0 01				     mov     al,1
+    392	0023  B4 02				     mov     ah,2
+    393	0025  EB 06				     jmp     short LptCmnIntr
+    394
+    395	0027			     Lpt3Intr:
+    396	0027  56				     push    si
+    397	0028  50				     push    ax
+    398	0029  B0 02				     mov     al,2
+    399	002B  B4 03				     mov     ah,3
+    400
+    401	002D			     LptCmnIntr:
+    402	002D  BE 0000e				     mov     si,offset TGROUP:LptTable
+    403	0030  2E: 88 26	0000e			     mov     cs:uPrtNo,ah
+    404	0035  EB 22				     jmp     short DiskIntrEntry
+    405
+    406
+    407	0037			     AuxIntr:
+    408	0037  56				     push    si
+    409	0038  50				     push    ax
+    410	0039  32 C0				     xor     al,al
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 11
+io.ASM
+
+
+
+    411	003B  EB 12				     jmp     short ComCmnIntr
+    412
+    413	003D			     Com2Intr:
+    414	003D  56				     push    si
+    415	003E  50				     push    ax
+    416	003F  B0 01				     mov     al,1
+    417	0041  EB 0C				     jmp     short ComCmnIntr
+    418
+    419	0043			     Com3Intr:
+    420	0043  56				     push    si
+    421	0044  50				     push    ax
+    422	0045  B0 02				     mov     al,2
+    423	0047  EB 06				     jmp     short ComCmnIntr
+    424
+    425	0049			     Com4Intr:
+    426	0049  56				     push    si
+    427	004A  50				     push    ax
+    428	004B  B0 03				     mov     al,3
+    429	004D  EB 00				     jmp     short ComCmnIntr
+    430
+    431	004F			     ComCmnIntr:
+    432	004F  BE 0000e				     mov     si,offset ComTable
+    433	0052  EB 05				     jmp     short DiskIntrEntry
+    434
+    435
+    436	0054			     DskIntr:
+    437	0054  56				     push    si
+    438	0055  BE 00D8r				     mov     si,offset TGROUP:DiskTable
+    439	0058			     CharIntrEntry:
+    440	0058  50				     push    ax
+    441	0059			     DiskIntrEntry:
+    442	0059  51				     push    cx
+    443	005A  52				     push    dx
+    444	005B  57				     push    di
+    445	005C  55				     push    bp
+    446	005D  1E				     push    ds
+    447	005E  06				     push    es
+    448	005F  53				     push    bx
+    449	0060  2E: A2 0004r			     mov     byte ptr cs:uUnitNumber,al
+    450	0064  2E: C5 1E	0000r			     lds     bx,cs:_ReqPktPtr
+    451	0069  2E: F6 04	80			     test    byte ptr cs:[si],80h
+    452	006D  74 20				     je	     AsmType
+    453
+    454	006F  8A 47 02				     mov     al,[bx+cmd]
+    455	0072  2E: 3A 04				     cmp     al,cs:[si]
+    456	0075  77 63				     ja	     _IOCommandError
+    457	0077  98				     cbw
+    458	0078  D1 E0				     shl     ax,1
+    459	007A  03 F0				     add     si,ax
+    460	007C  97				     xchg    di,ax
+    461
+    462	007D  1E				     push    ds
+    463	007E  53				     push    bx
+    464	007F  8B EC				     mov     bp,sp
+    465	0081  B8 0000s				     mov     ax,DGROUP
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 12
+io.ASM
+
+
+
+    466	0084  8E D8				     mov     ds,ax
+    467	0086  FC				     cld
+    468	0087  2E: FF 54	01			     call    word ptr cs:[si+1]
+    469	008B  59				     pop     cx
+    470	008C  59				     pop     cx
+    471	008D  EB 35				     jmp     short StoreStatus
+    472
+    473	008F  8A 47 01		     AsmType:	     mov     al,[bx+unit]
+    474	0092  8A 67 0D				     mov     ah,[bx+media]
+    475	0095  8B 4F 12				     mov     cx,[bx+count]
+    476	0098  8B 57 14				     mov     dx,[bx+start]
+    477	009B  97				     xchg    di,ax
+    478	009C  8A 47 02				     mov     al,[bx+cmd]
+    479	009F  2E: 3A 04				     cmp     al,cs:[si]
+    480	00A2  77 36				     ja	     _IOCommandError
+    481	00A4  98				     cbw
+    482	00A5  D1 E0				     shl     ax,1
+    483	00A7  03 F0				     add     si,ax
+    484	00A9  97				     xchg    di,ax
+    485
+    486	00AA  C4 7F 0E				     les     di,dword ptr [bx+trans]
+    487	00AD  50				     push    ax
+    488	00AE  B8 0000s				     mov     ax,DGROUP
+    489	00B1  8E D8				     mov     ds,ax
+    490	00B3  58				     pop     ax
+    491	00B4  FC				     cld
+    492	00B5  2E: FF 64	01			     jmp     word ptr cs:[si+1]
+    493
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 13
+io.ASM
+
+
+
+    494				     ;
+    495				     ; Name:
+    496				     ;	     _IOXXXXXXX
+    497				     ;
+    498				     ; Function:
+    499				     ;	     Exit routines for internal	device drivers.
+    500				     ;
+    501				     ; Description:
+    502				     ;	     These routines are	the exit for internal device drivers.  _IOSuccess
+    503				     ;	     is	for read/write functions and correctly returns for a successful
+    504				     ;	     read/write	operation by setting the remainng count	to zero.  _IOExit
+    505				     ;	     simply sets success bit and returns.  _IODone returns complete and
+    506				     ;	     busy status.  _IOCommandError returns and error status for	invalid
+    507				     ;	     commands.	_IOErrCnt corrects the remaining bytes for errors that
+    508				     ;	     occurred during partial read/write	operation.  _IOErrorExit is a
+    509				     ;	     generic error exit	that sets done and error.
+    510				     ;
+    511						     public  _IOSuccess
+    512	00B9			     _IOSuccess:
+    513	00B9  C5 1E 0000r			     lds     bx,_ReqPktPtr
+    514	00BD  33 C0				     xor     ax,ax
+    515	00BF  89 47 12				     mov     [bx+count],ax
+    516
+    517						     public  _IOExit
+    518	00C2			     _IOExit	     proc    far
+    519	00C2  B4 01				     mov     ah,1
+    520	00C4			     _IOExit	     endp
+    521
+    522	00C4			     StoreStatus     proc    far
+    523	00C4  2E: C5 1E	0000r			     lds     bx,cs:_ReqPktPtr
+    524	00C9  89 47 03				     mov     [bx+status],ax
+    525	00CC  5B				     pop     bx
+    526	00CD  07				     pop     es
+    527	00CE  1F				     pop     ds
+    528	00CF  5D				     pop     bp
+    529	00D0  5F				     pop     di
+    530	00D1  5A				     pop     dx
+    531	00D2  59				     pop     cx
+    532	00D3  58				     pop     ax
+    533	00D4  5E				     pop     si
+    534	00D5  CB				     ret
+    535	00D6			     StoreStatus     endp
+    536
+    537
+    538						     public  _IODone
+    539	00D6			     _IODone	     proc    far
+    540	00D6  B4 03				     mov     ah,3
+    541	00D8  EB EA				     jmp     short StoreStatus
+    542	00DA			     _IODone	     endp
+    543
+    544						     public  _IOCommandError
+    545	00DA			     _IOCommandError proc    near
+    546	00DA  B0 03				     mov     al,3
+    547	00DC			     _IOCommandError endp
+    548
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 14
+io.ASM
+
+
+
+    549						     public  _IOErrCnt
+    550	00DC			     _IOErrCnt:
+    551	00DC  2E: C5 1E	0000r			     lds     bx,cs:_ReqPktPtr
+    552	00E1  29 4F 12				     sub     [bx+count],cx
+    553						     public  _IOErrorExit
+    554	00E4			     _IOErrorExit:
+    555	00E4  B4 81				     mov     ah,81h
+    556	00E6  EB DC				     jmp     short StoreStatus
+    557
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 15
+io.ASM
+
+
+
+    558				     ;
+    559				     ; Name:
+    560				     ;	     GetUnitNum
+    561				     ;
+    562				     ; Function:
+    563				     ;	     Return the	internally set unit number.
+    564				     ;
+    565				     ; Description:
+    566				     ;	     Simply return the contents	of uUnitNumber.	 This version relies on
+    567				     ;	     no	segment	registers and makes a safe call	regardless of driver
+    568				     ;	     state.
+    569				     ;
+    570						     public  GetUnitNum
+    571	00E8			     GetUnitNum	     proc    near
+    572	00E8  2E: 8B 16	0004r			     mov     dx,cs:uUnitNumber
+    573	00ED  C3				     ret
+    574	00EE			     GetUnitNum	     endp
+    575
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 16
+io.ASM
+
+
+
+    576						     ;
+    577						     ; These are still old style DOS-C drivers.	 I'll replace
+    578						     ; them in the next	release
+    579						     ;
+    580
+    581
+    582						     ;
+    583						     ; block device interrupt
+    584						     ;
+    585						     ; NOTE: This code is not standard device driver handlers
+    586						     ; It is written for sperate code and data space.
+    587						     ;
+    588	00EE			     blk_entry	     proc    far
+    589	00EE  9C				     pushf
+    590	00EF  50				     push    ax
+    591	00F0  53				     push    bx
+    592	00F1  51				     push    cx
+    593	00F2  52				     push    dx
+    594	00F3  55				     push    bp
+    595	00F4  56				     push    si
+    596	00F5  57				     push    di
+    597	00F6  1E				     push    ds
+    598	00F7  06				     push    es
+    599
+    600						     ; small model
+    601	00F8  B8 0000s				     mov     ax,DGROUP			     ; correct for segments
+    602	00FB  8E D8				     mov     ds,ax			     ; ax to carry segment
+    603	00FD  89 26 0006r			     mov     word ptr DGROUP:blk_dos_stk,sp  ; use internal stack
+    604	0101  8C 16 0008r			     mov     word ptr DGROUP:blk_dos_seg,ss
+    605	0105  9C				     pushf				     ; put flags in bx
+    606	0106  5B				     pop     bx
+    607	0107  FA				     cli				     ; no interrupts
+    608	0108  8E D0				     mov     ss,ax
+    609	010A  BC 0000e				     mov     sp,offset DGROUP:blk_stk_top
+    610	010D  53				     push    bx
+    611	010E  9D				     popf				     ; restore interrupt flag
+    612	010F  8B EC				     mov     bp,sp			     ; make a c	frame
+    613	0111  FF 36 0002r			     push    word ptr _ReqPktPtr+2
+    614	0115  FF 36 0000r			     push    word ptr _ReqPktPtr
+    615	0119  E8 0000e				     call    _blk_driver
+    616	011C  59				     pop     cx
+    617	011D  59				     pop     cx
+    618	011E  C4 1E 0000r			     les     bx,dword ptr _ReqPktPtr	     ; now return completion code
+    619	0122  26: 89 47	03			     mov     word ptr es:[bx].status,ax	     ; mark operation complete
+    620	0126  FA				     cli				     ; no interrupts
+    621	0127  8B 26 0006r			     mov     sp,word ptr DGROUP:blk_dos_stk  ; use dos stack
+    622	012B  8E 16 0008r			     mov     ss,word ptr DGROUP:blk_dos_seg
+    623	012F  07				     pop     es
+    624	0130  1F				     pop     ds
+    625	0131  5F				     pop     di
+    626	0132  5E				     pop     si
+    627	0133  5D				     pop     bp
+    628	0134  5A				     pop     dx
+    629	0135  59				     pop     cx
+    630	0136  5B				     pop     bx
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 17
+io.ASM
+
+
+
+    631	0137  58				     pop     ax
+    632	0138  9D				     popf
+    633	0139  CB				     ret
+    634	013A			     blk_entry	     endp
+    635
+    636
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 18
+io.ASM
+
+
+
+    637
+    638						     ;
+    639						     ; clock device interrupt
+    640						     ;
+    641						     ; NOTE: This code is not standard device driver handlers
+    642						     ; It is written for sperate code and data space.
+    643						     ;
+    644	013A			     clk_entry	     proc    far
+    645	013A  9C				     pushf
+    646	013B  50				     push    ax
+    647	013C  53				     push    bx
+    648	013D  51				     push    cx
+    649	013E  52				     push    dx
+    650	013F  55				     push    bp
+    651	0140  56				     push    si
+    652	0141  57				     push    di
+    653	0142  1E				     push    ds
+    654	0143  06				     push    es
+    655
+    656						     ; small model
+    657	0144  B8 0000s				     mov     ax,DGROUP			     ; correct for segments
+    658	0147  8E D8				     mov     ds,ax			     ; ax to carry segment
+    659	0149  89 26 000Ar			     mov     word ptr DGROUP:clk_dos_stk,sp  ; use internal stack
+    660	014D  8C 16 000Cr			     mov     word ptr DGROUP:clk_dos_seg,ss
+    661	0151  9C				     pushf				     ; put flags in bx
+    662	0152  5B				     pop     bx
+    663	0153  FA				     cli				     ; no interrupts
+    664	0154  8E D0				     mov     ss,ax
+    665	0156  BC 0000e				     mov     sp,offset DGROUP:clk_stk_top
+    666	0159  53				     push    bx
+    667	015A  9D				     popf				     ; restore interrupt flag
+    668	015B  8B EC				     mov     bp,sp			     ; make a c	frame
+    669	015D  FF 36 0002r			     push    word ptr _ReqPktPtr+2
+    670	0161  FF 36 0000r			     push    word ptr _ReqPktPtr
+    671	0165  E8 0000e				     call    _clk_driver
+    672	0168  59				     pop     cx
+    673	0169  59				     pop     cx
+    674	016A  C4 1E 0000r			     les     bx,dword ptr _ReqPktPtr	     ; now return completion code
+    675	016E  26: 89 47	03			     mov     word ptr es:[bx].status,ax	     ; mark operation complete
+    676	0172  FA				     cli				     ; no interrupts
+    677	0173  8B 26 000Ar			     mov     sp,word ptr DGROUP:clk_dos_stk  ; use dos stack
+    678	0177  8E 16 000Cr			     mov     ss,word ptr DGROUP:clk_dos_seg
+    679	017B  07				     pop     es
+    680	017C  1F				     pop     ds
+    681	017D  5F				     pop     di
+    682	017E  5E				     pop     si
+    683	017F  5D				     pop     bp
+    684	0180  5A				     pop     dx
+    685	0181  59				     pop     cx
+    686	0182  5B				     pop     bx
+    687	0183  58				     pop     ax
+    688	0184  9D				     popf
+    689	0185  CB				     ret
+    690	0186			     clk_entry	     endp
+    691	0186			     _IO_TEXT	     ends
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 19
+io.ASM
+
+
+
+    692
+    693						     end
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 20
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "12/06/98"
+??FILENAME			  Text	 "io	  "
+??TIME				  Text	 "09:46:42"
+??VERSION			  Number 030A
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _IO_TEXT
+@FILENAME			  Text	 IO
+@WORDSIZE			  Text	 2
+ASMTYPE				  Near	 _IO_TEXT:008F
+AUXINTR				  Near	 _IO_TEXT:0037
+BLK_DOS_SEG			  Word	 _BSS:0008
+BLK_DOS_STK			  Word	 _BSS:0006
+BLK_ENTRY			  Far	 _IO_TEXT:00EE
+BLK_STK_TOP (blk_stk_top)	  Byte	 ----:---- Extern
+CHARINTRENTRY			  Near	 _IO_TEXT:0058
+CLK_DOS_SEG			  Word	 _BSS:000C
+CLK_DOS_STK			  Word	 _BSS:000A
+CLK_ENTRY			  Far	 _IO_TEXT:013A
+CLK_STK_TOP (clk_stk_top)	  Byte	 ----:---- Extern
+CMD				  Number 0002
+CMDLEN				  Number 0000
+COM2INTR			  Near	 _IO_TEXT:003D
+COM3INTR			  Near	 _IO_TEXT:0043
+COM4INTR			  Near	 _IO_TEXT:0049
+COMCMNINTR			  Near	 _IO_TEXT:004F
+COMMONNDRDEXIT (CommonNdRdExit)	  Word	 ----:---- Extern
+COMTABLE (ComTable)		  Word	 ----:---- Extern
+CONINTR				  Near	 _IO_TEXT:000B
+CONTABLE (ConTable)		  Word	 ----:---- Extern
+COUNT				  Number 0012
+DISKINTRENTRY			  Near	 _IO_TEXT:0059
+DISKTABLE			  Byte	 _IO_FIXED_DATA:00D8
+DSKINTR				  Near	 _IO_TEXT:0054
+GENSTRATEGY			  Far	 _IO_TEXT:0000
+GETUNITNUM (GetUnitNum)		  Near	 _IO_TEXT:00E8
+HUGE				  Number 001A
+LPT1INTR			  Near	 _IO_TEXT:0017
+LPT2INTR			  Near	 _IO_TEXT:001F
+LPT3INTR			  Near	 _IO_TEXT:0027
+LPTCMNINTR			  Near	 _IO_TEXT:002D
+LPTTABLE (LptTable)		  Word	 ----:---- Extern
+MEDIA				  Number 000D
+PRNINTR				  Near	 _IO_TEXT:0011
+STANDALONE			  Text	 1
+START				  Number 0014
+STATUS				  Number 0003
+STORESTATUS			  Far	 _IO_TEXT:00C4
+TRANS				  Number 000E
+UNIT				  Number 0001
+UPRTNO (uPrtNo)			  Byte	 ----:---- Extern
+UUNITNUMBER			  Word	 _BSS:0004
+VID				  Number 0016
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:42	    Page 21
+Symbol Table
+
+
+
+_AUX_DEV (_aux_dev)		  Dword	 _IO_FIXED_DATA:0024
+_BLK_DEV (_blk_dev)		  Number _IO_FIXED_DATA:00C6
+_BLK_DRIVER (_blk_driver)	  Near	 ----:---- Extern
+_CLK_DEV (_clk_dev)		  Number _IO_FIXED_DATA:00B4
+_CLK_DRIVER (_clk_driver)	  Near	 ----:---- Extern
+_COM1DEV			  Dword	 _IO_FIXED_DATA:006C
+_COM2DEV			  Dword	 _IO_FIXED_DATA:007E
+_COM3DEV			  Dword	 _IO_FIXED_DATA:0090
+_COM4DEV			  Dword	 _IO_FIXED_DATA:00A2
+_CON_DEV (_con_dev)		  Number _IO_FIXED_DATA:0000
+_IOCOMMANDERROR		       +  Near	 _IO_TEXT:00DA
+(_IOCommandError)
+_IODONE	(_IODone)		  Far	 _IO_TEXT:00D6
+_IOERRCNT (_IOErrCnt)		  Near	 _IO_TEXT:00DC
+_IOERROREXIT (_IOErrorExit)	  Near	 _IO_TEXT:00E4
+_IOEXIT	(_IOExit)		  Far	 _IO_TEXT:00C2
+_IOSUCCESS (_IOSuccess)		  Near	 _IO_TEXT:00B9
+_LPT1DEV			  Dword	 _IO_FIXED_DATA:0036
+_LPT2DEV			  Dword	 _IO_FIXED_DATA:0048
+_LPT3DEV			  Dword	 _IO_FIXED_DATA:005A
+_NUMFLOPPIES (_NumFloppies)	  Word	 ----:---- Extern
+_PRN_DEV (_prn_dev)		  Dword	 _IO_FIXED_DATA:0012
+_REQPKTPTR (_ReqPktPtr)		  Dword	 _BSS:0000
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _BSS				  16  000E Word	  Public  BSS
+  _BSSEND			  16  0000 Byte	  Public  STACK
+  _DATA				  16  0000 Word	  Public  DATA
+  _FIXED_DATA			  16  0000 Para	  Public  DATA
+TGROUP				  Group
+  _IO_FIXED_DATA		  16  00D9 Word	  Public  CODE
+  _IO_TEXT			  16  0186 Byte	  Public  CODE
+  _TEXT				  16  0000 Byte	  Public  CODE
+

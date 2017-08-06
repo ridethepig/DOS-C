@@ -1,0 +1,400 @@
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 1
+console.ASM
+
+
+
+      1				     ;
+      2				     ; File:
+      3				     ;				console.asm
+      4				     ; Description:
+      5				     ;			    Console device driver
+      6				     ;
+      7				     ;			     Copyright (c) 1998
+      8				     ;			     Pasquale J. Villani
+      9				     ;			     All Rights	Reserved
+     10				     ;
+     11				     ; This file is part of DOS-C.
+     12				     ;
+     13				     ; DOS-C is	free software; you can redistribute it and/or
+     14				     ; modify it under the terms of the	GNU General public License
+     15				     ; as published by the Free	Software Foundation; either version
+     16				     ; 2, or (at your option) any later	version.
+     17				     ;
+     18				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+     19				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+     20				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+     21				     ; the GNU General public License for more details.
+     22				     ;
+     23				     ; You should have received	a copy of the GNU General public
+     24				     ; License along with DOS-C; see the file COPYING.	If not,
+     25				     ; write to	the Free Software Foundation, 675 Mass Ave,
+     26				     ; Cambridge, MA 02139, USA.
+     27				     ;
+     28				     ; $Header$
+     29				     ;
+     30				     ; $Log$
+     31				     ; $EndLog$
+     32				     ;
+     33
+     34
+     35						     include io.inc
+1    36				     ;
+1    37				     ; File:
+1    38				     ;				  io.inc
+1    39				     ; Description:
+1    40				     ;	   Segments and	external common	routines used by various device	drivers
+1    41				     ;
+1    42				     ;			     Copyright (c) 1998
+1    43				     ;			     Pasquale J. Villani
+1    44				     ;			     All Rights	Reserved
+1    45				     ;
+1    46				     ; This file is part of DOS-C.
+1    47				     ;
+1    48				     ; DOS-C is	free software; you can redistribute it and/or
+1    49				     ; modify it under the terms of the	GNU General Public License
+1    50				     ; as published by the Free	Software Foundation; either version
+1    51				     ; 2, or (at your option) any later	version.
+1    52				     ;
+1    53				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+1    54				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+1    55				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 2
+console.ASM
+
+
+
+1    56				     ; the GNU General Public License for more details.
+1    57				     ;
+1    58				     ; You should have received	a copy of the GNU General Public
+1    59				     ; License along with DOS-C; see the file COPYING.	If not,
+1    60				     ; write to	the Free Software Foundation, 675 Mass Ave,
+1    61				     ; Cambridge, MA 02139, USA.
+1    62				     ;
+1    63				     ; $Logfile:   C:/usr/patv/dos-c/src/kernel/io.inv	$
+1    64				     ;
+1    65				     ; $Header:	  C:/usr/patv/dos-c/src/kernel/io.inv	1.0   06 Dec 1998  8:13:02   patv  $
+1    66				     ;
+1    67				     ; $Log:   C:/usr/patv/dos-c/src/kernel/io.inv  $
+1    68				     ;
+1    69				     ;	  Rev 1.0   06 Dec 1998	 8:13:02   patv
+1    70				     ; Initial revision.
+1    71				     ; $EndLog$
+1    72				     ;
+1    73
+1    74	0000			     _TEXT	     segment byte public 'CODE'
+1    75				     TGROUP	     group   _TEXT,_IO_TEXT,_IO_FIXED_DATA
+1    76				     DGROUP	     group   _FIXED_DATA,_DATA,_BSS,_BSSEND  ; small model
+1    77						     assume  cs:TGROUP,ds:DGROUP,ss:DGROUP
+1    78	0000			     _TEXT	     ends
+1    79
+1    80	0000			     _IO_TEXT	     segment byte public 'CODE'
+1    81	0000			     _IO_TEXT	     ends
+1    82
+1    83	0000			     _IO_FIXED_DATA  segment word public 'CODE'
+1    84	0000			     _IO_FIXED_DATA  ends
+1    85
+1    86	0000			     _FIXED_DATA     segment para public 'DATA'
+1    87	0000			     _FIXED_DATA     ends
+1    88
+1    89	0000			     _DATA	     segment word public 'DATA'
+1    90	0000			     _DATA	     ends
+1    91
+1    92	0000			     _BSS	     segment word public 'BSS'
+1    93	0000			     _BSS	     ends
+1    94
+1    95	0000			     _BSSEND	     segment byte public 'STACK'
+1    96	0000			     _BSSEND	     ends
+1    97
+1    98
+1    99						     extrn   _IOExit:near
+1   100						     extrn   _IOSuccess:near
+1   101						     extrn   _IOErrorExit:near
+1   102						     extrn   _IOErrCnt:near
+1   103						     extrn   _IODone:near
+1   104						     extrn   _IOCommandError:near
+1   105						     extrn   GetUnitNum:near
+1   106						     extrn   _ReqPktPtr:dword
+1   107
+    108
+    109
+    110	0000			     _BSS	    segment word public	'BSS'
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 3
+console.ASM
+
+
+
+    111	0000  00		     uScanCode	     db	     (?)		     ; Scan code for con: device
+    112	0001			     _BSS	    ends
+    113
+    114	0000			     _IO_FIXED_DATA  segment word public 'CODE'
+    115						     assume cs:TGROUP
+    116
+    117						     public  ConTable
+    118	0000  0A		     ConTable	     db	     0Ah
+    119	0001  0000e				     dw	     offset _IOExit
+    120	0003  0000e				     dw	     offset _IOExit
+    121	0005  0000e				     dw	     offset _IOExit
+    122	0007  0000e				     dw	     offset _IOCommandError
+    123	0009  0000r				     dw	     offset ConRead
+    124	000B  002Br				     dw	     offset CommonNdRdExit
+    125	000D  0000e				     dw	     offset _IOExit
+    126	000F  0054r				     dw	     offset ConInpFlush
+    127	0011  006Cr				     dw	     offset ConWrite
+    128	0013  006Cr				     dw	     offset ConWrite
+    129	0015  0000e				     dw	     offset _IOExit
+    130	0017			     _IO_FIXED_DATA  ends
+    131
+    132	      =7200		     PRT_SCREEN	     equ     7200h
+    133	      =0010		     CTL_P	     equ     10h
+    134
+    135	0000			     _IO_TEXT	     segment byte public 'CODE'
+    136						     assume cs:TGROUP
+    137
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 4
+console.ASM
+
+
+
+    138				     ;
+    139				     ; Name:
+    140				     ;	     ConRead
+    141				     ;
+    142				     ; Function:
+    143				     ;	     Read to address in	es:di characters from the keyboard.  Cx	contains
+    144				     ;	     a count of	how many characters are	to be transferred.
+    145				     ;
+    146				     ; Description:
+    147				     ;	     Calls KbdRdChar to	read the characters.  Destroys ax.
+    148				     ;
+    149						     public  ConRead
+    150	0000			     ConRead	     proc    far
+    151	0000  E3 06				     jcxz    ConRead2		     ; Exit if read of zero
+    152
+    153	0002			     ConRead1:
+    154	0002  E8 0006				     call    KbdRdChar		     ; Get a char from kbd in al
+    155	0005  AA				     stosb			     ; Store al	to es:[di]
+    156	0006  E2 FA				     loop    ConRead1		     ; Loop until all are read
+    157
+    158	0008			     ConRead2:
+    159	0008  E9 0000e				     jmp     _IOExit
+    160	000B			     ConRead	     endp
+    161
+    162
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 5
+console.ASM
+
+
+
+    163				     ;
+    164				     ; Name:
+    165				     ;	     KbdRdChar
+    166				     ;
+    167				     ; Function:
+    168				     ;	     Read a character from the keyboard.
+    169				     ;
+    170				     ; Description:
+    171				     ;	     This subroutine reads a character fromthe keyboard.  It also handles
+    172				     ;	     a couple of special functions.  It	converts the print screen key to
+    173				     ;	     a control-P.  It also accounts for	extended scan codes by saving off
+    174				     ;	     the high byte of the return and returning it if it	was non-zero on
+    175				     ;	     the previous read.
+    176				     ;
+    177						     public  KbdRdChar
+    178	000B			     KbdRdChar	     proc    near
+    179	000B  33 C0				     xor     ax,ax		     ; Zero the	scratch	register
+    180	000D  86 06 0000r			     xchg    byte ptr ds:[uScanCode],al	; and swap with	scan code
+    181	0011  0A C0				     or	     al,al		     ; Test to see if it was set
+    182	0013  75 15				     jnz     KbdRdRtn		     ; Exit if it was, returning it
+    183	0015  CD 16				     int     16h		     ; get keybd char in al, ah=scan
+    184	0017  0B C0				     or	     ax,ax		     ; Zero ?
+    185	0019  74 F0				     jz	     KbdRdChar		     ; Loop if it is
+    186	001B  3D 7200				     cmp     ax,PRT_SCREEN	     ; Print screen?
+    187	001E  75 02				     jne     KbdRd1		     ; Nope, keep going
+    188	0020  B0 10				     mov     al,CTL_P			     ; Yep, make it ^P
+    189	0022			     KbdRd1:
+    190	0022  0A C0				     or	     al,al		     ; Extended	key?
+    191	0024  75 04				     jnz     KbdRdRtn		     ; Nope, just exit
+    192	0026  88 26 0000r			     mov     byte ptr ds:[uScanCode],ah	; Yep, save the	scan code
+    193	002A			     KbdRdRtn:
+    194	002A  C3				     retn
+    195	002B			     KbdRdChar	     endp
+    196
+    197
+    198
+    199						     public  CommonNdRdExit
+    200	002B			     CommonNdRdExit	  proc	  far
+    201	002B  A0 0000r				     mov     al,uScanCode	     ; Test for	last scan code
+    202	002E  0A C0				     or	     al,al		     ; Was it zero ?
+    203	0030  75 15				     jnz     ConNdRd2		     ; Jump if there's a char waiting
+    204	0032  B4 01				     mov     ah,1
+    205	0034  CD 16				     int     16h		     ; Get status, if zf=0  al=char
+    206	0036  74 19				     jz	     ConNdRd4		     ; Jump if chrar available
+    207	0038  0B C0				     or	     ax,ax		     ; Zero ?
+    208	003A  75 04				     jnz     ConNdRd1		     ; Jump if not zero
+    209	003C  CD 16				     int     16h		     ; get status, if zf=0  al=char
+    210	003E  EB EB				     jmp     short CommonNdRdExit
+    211
+    212	0040			     ConNdRd1:
+    213	0040  3D 7200				     cmp     ax,PRT_SCREEN	     ; Was print screen	key pressed?
+    214	0043  75 02				     jne     ConNdRd2		     ; Jump if not
+    215	0045  B0 10				     mov     al,CTL_P
+    216
+    217	0047			     ConNdRd2:
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 6
+console.ASM
+
+
+
+    218	0047  C5 1E 0000e			     lds     bx,_ReqPktPtr	     ; Set the status
+    219	004B  88 47 0D				     mov     [bx+0Dh],al
+    220
+    221	004E			     ConNdRd3:
+    222	004E  E9 0000e				     jmp     _IOExit
+    223
+    224	0051			     ConNdRd4:
+    225	0051  E9 0000e				     jmp     _IODone
+    226	0054			     CommonNdRdExit	  endp
+    227
+    228
+    229
+    230						     public  ConInpFlush
+    231	0054			     ConInpFlush     proc    far
+    232	0054  E8 0003				     call    KbdInpChar
+    233	0057  E9 0000e				     jmp     _IOExit
+    234	005A			     ConInpFlush     endp
+    235
+    236
+    237
+    238	005A			     KbdInpChar	     proc    near
+    239	005A  C6 06 0000r 00			     mov     byte ptr ds:[uScanCode],0
+    240	005F			     KbdInpCh1:
+    241	005F  B4 01				     mov     ah,1
+    242	0061  CD 16				     int     16h		     ; get status, if zf=0  al=char
+    243	0063  74 06				     jz	     KbdInpRtn		     ; Jump if zero
+    244	0065  32 E4				     xor     ah,ah		     ; Zero register
+    245	0067  CD 16				     int     16h		     ; get keybd char in al, ah=scan
+    246	0069  EB F4				     jmp     short KbdInpCh1
+    247	006B			     KbdInpRtn:
+    248	006B  C3				     retn
+    249	006C			     KbdInpChar	     endp
+    250
+    251
+    252						     public  ConWrite
+    253	006C			     ConWrite	     proc    far
+    254	006C  E3 E0				     jcxz    ConNdRd3		     ; Exit if nothing to write
+    255	006E			     ConWr1:
+    256	006E  26: 8A 05				     mov     al,es:[di]
+    257	0071  47				     inc     di
+    258	0072  CD 29				     int     29h		     ; Do fast output call
+    259	0074  E2 F8				     loop    ConWr1		     ; Loop if more to output
+    260	0076  E9 0000e				     jmp     _IOExit
+    261	0079			     ConWrite	     endp
+    262
+    263	0079			     CBreak:
+    264	0079  2E: C6 06	0000r 03		     mov     cs:uScanCode,3	     ; Put a ^C	into the buffer
+    265	007F			     IntRetn:
+    266	007F  CF				     iret
+    267
+    268						     public  _int29_handler
+    269	0080			     _int29_handler  proc    far
+    270	0080  50				     push    ax
+    271	0081  56				     push    si
+    272	0082  57				     push    di
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 7
+console.ASM
+
+
+
+    273	0083  55				     push    bp
+    274	0084  53				     push    bx
+    275	0085  B4 0E				     mov     ah,0Eh
+    276	0087  B7 00				     mov     bh,0
+    277	0089  B3 07				     mov     bl,7
+    278	008B  CD 10				     int     10h		     ; write char al, teletype mode
+    279	008D  5B				     pop     bx
+    280	008E  5D				     pop     bp
+    281	008F  5F				     pop     di
+    282	0090  5E				     pop     si
+    283	0091  58				     pop     ax
+    284	0092  CF				     iret
+    285	0093			     _int29_handler  endp
+    286
+    287
+    288						     public  _break_handler
+    289	0093			     _break_handler  proc    near
+    290	0093  C3				     ret
+    291	0094			     _break_handler  endp
+    292
+    293
+    294	0094			     _IO_TEXT	     ends
+    295
+    296						     end
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 8
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "12/06/98"
+??FILENAME			  Text	 "console "
+??TIME				  Text	 "09:46:45"
+??VERSION			  Number 030A
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _IO_TEXT
+@FILENAME			  Text	 CONSOLE
+@WORDSIZE			  Text	 2
+CBREAK				  Near	 _IO_TEXT:0079
+COMMONNDRDEXIT (CommonNdRdExit)	  Far	 _IO_TEXT:002B
+CONINPFLUSH (ConInpFlush)	  Far	 _IO_TEXT:0054
+CONNDRD1			  Near	 _IO_TEXT:0040
+CONNDRD2			  Near	 _IO_TEXT:0047
+CONNDRD3			  Near	 _IO_TEXT:004E
+CONNDRD4			  Near	 _IO_TEXT:0051
+CONREAD	(ConRead)		  Far	 _IO_TEXT:0000
+CONREAD1			  Near	 _IO_TEXT:0002
+CONREAD2			  Near	 _IO_TEXT:0008
+CONTABLE (ConTable)		  Byte	 _IO_FIXED_DATA:0000
+CONWR1				  Near	 _IO_TEXT:006E
+CONWRITE (ConWrite)		  Far	 _IO_TEXT:006C
+CTL_P				  Number 0010
+GETUNITNUM (GetUnitNum)		  Near	 ----:---- Extern
+INTRETN				  Near	 _IO_TEXT:007F
+KBDINPCH1			  Near	 _IO_TEXT:005F
+KBDINPCHAR			  Near	 _IO_TEXT:005A
+KBDINPRTN			  Near	 _IO_TEXT:006B
+KBDRD1				  Near	 _IO_TEXT:0022
+KBDRDCHAR (KbdRdChar)		  Near	 _IO_TEXT:000B
+KBDRDRTN			  Near	 _IO_TEXT:002A
+PRT_SCREEN			  Number 7200
+STANDALONE			  Text	 1
+USCANCODE			  Byte	 _BSS:0000
+_BREAK_HANDLER (_break_handler)	  Near	 _IO_TEXT:0093
+_INT29_HANDLER (_int29_handler)	  Far	 _IO_TEXT:0080
+_IOCOMMANDERROR		       +  Near	 ----:---- Extern
+(_IOCommandError)
+_IODONE	(_IODone)		  Near	 ----:---- Extern
+_IOERRCNT (_IOErrCnt)		  Near	 ----:---- Extern
+_IOERROREXIT (_IOErrorExit)	  Near	 ----:---- Extern
+_IOEXIT	(_IOExit)		  Near	 ----:---- Extern
+_IOSUCCESS (_IOSuccess)		  Near	 ----:---- Extern
+_REQPKTPTR (_ReqPktPtr)		  Dword	 ----:---- Extern
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _BSS				  16  0001 Word	  Public  BSS
+  _BSSEND			  16  0000 Byte	  Public  STACK
+  _DATA				  16  0000 Word	  Public  DATA
+  _FIXED_DATA			  16  0000 Para	  Public  DATA
+TGROUP				  Group
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:45	    Page 9
+Symbol Table
+
+
+
+  _IO_FIXED_DATA		  16  0017 Word	  Public  CODE
+  _IO_TEXT			  16  0094 Byte	  Public  CODE
+  _TEXT				  16  0000 Byte	  Public  CODE
+

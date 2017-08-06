@@ -1,0 +1,319 @@
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:49	    Page 1
+irqstack.asm
+
+
+
+      1				     ; File:
+      2				     ;			       irqstack.asm
+      3				     ; Description:
+      4				     ;	   Assembly support routines for hardware stack	support
+      5				     ;
+      6				     ;			  Copyright (c)	1997, 1998
+      7				     ;				Svante Frey
+      8				     ;			     All Rights	Reserved
+      9				     ;
+     10				     ; This file is part of DOS-C.
+     11				     ;
+     12				     ; DOS-C is	free software; you can redistribute it and/or
+     13				     ; modify it under the terms of the	GNU General Public License
+     14				     ; as published by the Free	Software Foundation; either version
+     15				     ; 2, or (at your option) any later	version.
+     16				     ;
+     17				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+     18				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+     19				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+     20				     ; the GNU General Public License for more details.
+     21				     ;
+     22				     ; You should have received	a copy of the GNU General Public
+     23				     ; License along with DOS-C; see the file COPYING.	If not,
+     24				     ; write to	the Free Software Foundation, 675 Mass Ave,
+     25				     ; Cambridge, MA 02139, USA.
+     26				     ;
+     27				     ; $Logfile:   C:/usr/patv/dos-c/src/kernel/irqstack.asv  $
+     28				     ;
+     29				     ; $Header:	  C:/usr/patv/dos-c/src/kernel/irqstack.asv   1.2   06 Dec 1998	 8:49:08   patv	 $
+     30				     ;
+     31				     ; $Log:   C:/usr/patv/dos-c/src/kernel/irqstack.asv  $
+     32				     ;
+     33				     ;	   Rev 1.2   06	Dec 1998  8:49:08   patv
+     34				     ;	Bug fixes.
+     35				     ;
+     36				     ;	   Rev 1.1   22	Jan 1997 13:15:34   patv
+     37				     ;	pre-0.92 Svante	Frey bug fixes
+     38				     ;
+     39				     ;	   Rev 1.0   16	Jan 1997 21:43:44   patv
+     40				     ;	Initial	revision.
+     41				     ; $EndLog$
+     42				     ;
+     43
+     44
+     45				     ;	     Code for stack switching during hardware interrupts.
+     46
+     47	0000			     _TEXT	     segment WORD PUBLIC 'CODE'
+     48						     assume  cs:_TEXT
+     49
+     50	0000  10*(????????)	     old_vectors     dd	     16	dup(?)
+     51	0040  ????		     stack_size	     dw	     ?
+     52	0042  ????		     stack_top	     dw	     ?
+     53	0044  ????		     stack_offs	     dw	     ?
+     54	0046  ????		     stack_seg	     dw	     ?
+     55
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:49	    Page 2
+irqstack.asm
+
+
+
+     56	0048  53		     irq_0:	     push    bx
+     57	0049  BB 0000				     mov     bx, 0 * 4
+     58	004C  EB 58				     jmp     short general_irq_service
+     59
+     60	004E  53		     irq_1:	     push    bx
+     61	004F  BB 0004				     mov     bx, 1 * 4
+     62	0052  EB 52				     jmp     short general_irq_service
+     63
+     64	0054  53		     irq_2:	     push    bx
+     65	0055  BB 0008				     mov     bx, 2 * 4
+     66	0058  EB 4C				     jmp     short general_irq_service
+     67
+     68	005A  53		     irq_3:	     push    bx
+     69	005B  BB 000C				     mov     bx, 3 * 4
+     70	005E  EB 46				     jmp     short general_irq_service
+     71
+     72	0060  53		     irq_4:	     push    bx
+     73	0061  BB 0010				     mov     bx, 4 * 4
+     74	0064  EB 40				     jmp     short general_irq_service
+     75
+     76	0066  53		     irq_5:	     push    bx
+     77	0067  BB 0014				     mov     bx, 5 * 4
+     78	006A  EB 3A				     jmp     short general_irq_service
+     79
+     80	006C  53		     irq_6:	     push    bx
+     81	006D  BB 0018				     mov     bx, 6 * 4
+     82	0070  EB 34				     jmp     short general_irq_service
+     83
+     84	0072  53		     irq_7:	     push    bx
+     85	0073  BB 001C				     mov     bx, 7 * 4
+     86	0076  EB 2E				     jmp     short general_irq_service
+     87
+     88	0078  53		     irq_08:	     push    bx
+     89	0079  BB 0020				     mov     bx, 8 * 4
+     90	007C  EB 28				     jmp     short general_irq_service
+     91
+     92	007E  53		     irq_09:	     push    bx
+     93	007F  BB 0024				     mov     bx, 9 * 4
+     94	0082  EB 22				     jmp     short general_irq_service
+     95
+     96	0084  53		     irq_0a:	     push    bx
+     97	0085  BB 0028				     mov     bx, 0ah * 4
+     98	0088  EB 1C				     jmp     short general_irq_service
+     99
+    100	008A  53		     irq_0b:	     push    bx
+    101	008B  BB 002C				     mov     bx, 0bh * 4
+    102	008E  EB 16				     jmp     short general_irq_service
+    103
+    104	0090  53		     irq_0c:	     push    bx
+    105	0091  BB 0030				     mov     bx, 0ch * 4
+    106	0094  EB 10				     jmp     short general_irq_service
+    107
+    108	0096  53		     irq_0d:	     push    bx
+    109	0097  BB 0034				     mov     bx, 0dh * 4
+    110	009A  EB 0A				     jmp     short general_irq_service
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:49	    Page 3
+irqstack.asm
+
+
+
+    111
+    112	009C  53		     irq_0e:	     push    bx
+    113	009D  BB 0038				     mov     bx, 0eh * 4
+    114	00A0  EB 04				     jmp     short general_irq_service
+    115
+    116	00A2  53		     irq_0f:	     push    bx
+    117	00A3  BB 003C				     mov     bx, 0fh * 4
+    118				     ;		      jmp     short general_irq_service
+    119
+    120	00A6			     General_irq_service:
+    121	00A6  52				     push    dx
+    122	00A7  50				     push    ax
+    123	00A8  1E				     push    ds
+    124
+    125	00A9  8C C8				     mov     ax, cs
+    126	00AB  8E D8				     mov     ds, ax
+    127
+    128	00AD  2E: A1 0042r			     mov     ax, stack_top
+    129	00B1  2E: 3B 06	0044r			     cmp     ax, stack_offs
+    130	00B6  76 30				     jbe     dont_switch
+    131
+    132	00B8  8C D2				     mov     dx, ss
+    133	00BA  8B C4				     mov     ax, sp
+    134
+    135	00BC  2E: 8E 16	0046r			     mov     ss, stack_seg
+    136	00C1  2E: 8B 26	0042r			     mov     sp, stack_top
+    137
+    138	00C6  52				     push    dx		     ; save old	SS:SP on new stack
+    139	00C7  50				     push    ax
+    140
+    141	00C8  2E: A1 0040r			     mov     ax, stack_size
+    142	00CC  2E: 29 06	0042r			     sub     stack_top,	ax
+    143
+    144	00D1  9C				     pushf
+    145	00D2  2E: FF 9F	0000r			     call    old_vectors[bx]
+    146
+    147	00D7  FA				     cli
+    148	00D8  2E: 01 06	0042r			     add     stack_top,	ax
+    149
+    150	00DD  58				     pop     ax		     ; get stored SS:SP
+    151	00DE  5A				     pop     dx
+    152
+    153	00DF  8E D2				     mov     ss, dx	     ; switch back to old stack
+    154	00E1  8B E0				     mov     sp, ax
+    155
+    156	00E3  1F				     pop     ds		     ; restore registers and return
+    157	00E4  58				     pop     ax
+    158	00E5  5A				     pop     dx
+    159	00E6  5B				     pop     bx
+    160	00E7  CF				     iret
+    161
+    162	00E8  9C		     dont_switch:    pushf
+    163	00E9  2E: FF 9F	0000r			     call    dword ptr old_vectors[bx]
+    164	00EE  1F				     pop     ds
+    165	00EF  58				     pop     ax
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:49	    Page 4
+irqstack.asm
+
+
+
+    166	00F0  5A				     pop     dx
+    167	00F1  5B				     pop     bx
+    168	00F2  CF				     iret
+    169
+    170				     public  _init_stacks
+    171				     ; VOID    init_stacks(VOID	FAR *stack_base, COUNT nStacks,	WORD stackSize);
+    172
+    173	00F3			     _init_stacks    proc    near
+    174	00F3  55				     push    bp
+    175	00F4  8B EC				     mov     bp, sp
+    176	00F6  1E				     push    ds
+    177	00F7  57				     push    di
+    178	00F8  56				     push    si
+    179
+    180
+    181	00F9  0E				     push    cs
+    182	00FA  1F				     pop     ds
+    183
+    184	00FB  8B 5E 04				     mov     bx, [bp+4]
+    185	00FE  8B 56 06				     mov     dx, [bp+6]
+    186	0101  8B 46 08				     mov     ax, [bp+8]
+    187	0104  8B 4E 0A				     mov     cx, [bp+0ah]
+    188
+    189	0107  2E: 89 0E	0040r			     mov     stack_size, cx
+    190	010C  2E: 89 1E	0044r			     mov     stack_offs, bx
+    191	0111  2E: 89 16	0046r			     mov     stack_seg,	dx
+    192
+    193	0116  F7 E1				     mul     cx
+    194	0118  03 C3				     add     ax, bx
+    195	011A  2E: A3 0042r			     mov     stack_top,	ax
+    196
+    197	011E  33 C0				     xor     ax, ax
+    198	0120  8E D8				     mov     ds, ax
+    199
+    200	0122  0E				     push    cs
+    201	0123  07				     pop     es
+    202
+    203	0124  BF 0000r				     mov     di, offset	old_vectors
+    204	0127  BE 0020				     mov     si, 8 * 4
+    205	012A  B9 0010				     mov     cx, 10h
+    206	012D  F3> A5				     rep     movsw
+    207
+    208	012F  BE 01C0				     mov     si, 70h * 4
+    209	0132  B9 0010				     mov     cx, 10h
+    210	0135  F3> A5				     rep     movsw
+    211
+    212	0137  1E				     push    ds
+    213	0138  07				     pop     es
+    214
+    215	0139  BF 0020				     mov     di, 8 * 4
+    216	013C  BA 0048r				     mov     dx, offset	irq_0
+    217	013F  E8 000B				     call    set_vect
+    218
+    219	0142  BF 01C0				     mov     di, 70h * 4
+    220	0145  E8 0005				     call    set_vect
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:49	    Page 5
+irqstack.asm
+
+
+
+    221
+    222	0148  5E				     pop     si
+    223	0149  5F				     pop     di
+    224	014A  1F				     pop     ds
+    225	014B  5D				     pop     bp
+    226	014C  C3				     ret
+    227	014D			     _init_stacks    endp
+    228
+    229	014D			     set_vect	     proc
+    230	014D  B9 0008				     mov     cx, 8
+    231
+    232	0150  8B C2		     set_next:	     mov     ax, dx
+    233	0152  FA				     cli
+    234	0153  AB				     stosw
+    235	0154  8C C8				     mov     ax, cs
+    236	0156  AB				     stosw
+    237	0157  FB				     sti
+    238	0158  83 C2 06				     add     dx, offset	irq_1 -	offset irq_0
+    239	015B  E2 F3				     loop    set_next
+    240
+    241	015D  C3				     ret
+    242	015E			     set_vect	     endp
+    243
+    244	015E			     _TEXT	     ENDS
+    245
+    246						     end
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:49	    Page 6
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "12/06/98"
+??FILENAME			  Text	 "irqstack"
+??TIME				  Text	 "09:46:49"
+??VERSION			  Number 030A
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _TEXT
+@FILENAME			  Text	 IRQSTACK
+@WORDSIZE			  Text	 2
+DONT_SWITCH			  Near	 _TEXT:00E8
+GENERAL_IRQ_SERVICE		  Near	 _TEXT:00A6
+IRQ_0				  Near	 _TEXT:0048
+IRQ_08				  Near	 _TEXT:0078
+IRQ_09				  Near	 _TEXT:007E
+IRQ_0A				  Near	 _TEXT:0084
+IRQ_0B				  Near	 _TEXT:008A
+IRQ_0C				  Near	 _TEXT:0090
+IRQ_0D				  Near	 _TEXT:0096
+IRQ_0E				  Near	 _TEXT:009C
+IRQ_0F				  Near	 _TEXT:00A2
+IRQ_1				  Near	 _TEXT:004E
+IRQ_2				  Near	 _TEXT:0054
+IRQ_3				  Near	 _TEXT:005A
+IRQ_4				  Near	 _TEXT:0060
+IRQ_5				  Near	 _TEXT:0066
+IRQ_6				  Near	 _TEXT:006C
+IRQ_7				  Near	 _TEXT:0072
+OLD_VECTORS			  Dword	 _TEXT:0000
+SET_NEXT			  Near	 _TEXT:0150
+SET_VECT			  Near	 _TEXT:014D
+STACK_OFFS			  Word	 _TEXT:0044
+STACK_SEG			  Word	 _TEXT:0046
+STACK_SIZE			  Word	 _TEXT:0040
+STACK_TOP			  Word	 _TEXT:0042
+STANDALONE			  Text	 1
+_INIT_STACKS (_init_stacks)	  Near	 _TEXT:00F3
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+_TEXT				  16  015E Word	  Public  CODE
+

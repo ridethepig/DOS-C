@@ -1,0 +1,510 @@
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 1
+PROCSUPT.ASM
+
+
+
+      1				     ;
+      2				     ; File:
+      3				     ;			       procsupt.asm
+      4				     ; Description:
+      5				     ;	   Assembly support routines for process handling, etc.
+      6				     ;
+      7				     ;			   Copyright (c) 1995,1998
+      8				     ;			     Pasquale J. Villani
+      9				     ;			     All Rights	Reserved
+     10				     ;
+     11				     ; This file is part of DOS-C.
+     12				     ;
+     13				     ; DOS-C is	free software; you can redistribute it and/or
+     14				     ; modify it under the terms of the	GNU General Public License
+     15				     ; as published by the Free	Software Foundation; either version
+     16				     ; 2, or (at your option) any later	version.
+     17				     ;
+     18				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+     19				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+     20				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+     21				     ; the GNU General Public License for more details.
+     22				     ;
+     23				     ; You should have received	a copy of the GNU General Public
+     24				     ; License along with DOS-C; see the file COPYING.	If not,
+     25				     ; write to	the Free Software Foundation, 675 Mass Ave,
+     26				     ; Cambridge, MA 02139, USA.
+     27				     ;
+     28				     ; $Logfile:   C:/usr/patv/dos-c/src/kernel/procsupt.asv  $
+     29				     ;
+     30				     ; $Header:	  C:/usr/patv/dos-c/src/kernel/procsupt.asv   1.4   06 Dec 1998	 8:46:44   patv	 $
+     31				     ;
+     32				     ; $Log:   C:/usr/patv/dos-c/src/kernel/procsupt.asv  $
+     33				     ;
+     34				     ;	 Rev 1.4   06 Dec 1998	8:46:44	  patv
+     35				     ;Bug fixes.
+     36				     ;
+     37				     ;	 Rev 1.3   07 Feb 1998 20:42:08	  patv
+     38				     ;Modified stack fram to match DOS standard
+     39				     ;
+     40				     ;	 Rev 1.2   29 May 1996 21:03:36	  patv
+     41				     ;bug fixes	for v0.91a
+     42				     ;
+     43				     ;	 Rev 1.1   01 Sep 1995 17:54:24	  patv
+     44				     ;First GPL	release.
+     45				     ;
+     46				     ;	 Rev 1.0   02 Jul 1995	9:05:58	  patv
+     47				     ;Initial revision.
+     48				     ; $EndLog$
+     49				     ;
+     50
+     51
+     52	0000			     _TEXT	     segment byte public 'CODE'
+     53				     DGROUP	     group   _DATA,_BSS,_BSSEND		     ; small model
+     54						     assume  cs:_TEXT,ds:DGROUP,ss:DGROUP
+     55	0000			     _TEXT	     ends
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 2
+PROCSUPT.ASM
+
+
+
+     56
+     57	0000			     _DATA	     segment word public 'DATA'
+     58	0000			     _DATA	     ends
+     59
+     60	0000			     _BSS	     segment word public 'BSS'
+     61	0000			     _BSS	     ends
+     62
+     63	0000			     _BSSEND	     segment byte public 'STACK'
+     64	0000			     _BSSEND	     ends
+     65
+     66
+     67
+     68						     extrn   _api_sp:word	     ; api stacks - for	context
+     69						     extrn   _api_ss:word	     ; switching
+     70						     extrn   _usr_sp:word	     ; user stacks
+     71						     extrn   _usr_ss:word
+     72
+     73						     extrn   _kstackp:near	     ; kernel stack
+     74						     extrn   _ustackp:near	     ; new task	stack
+     75
+     76						     extrn   _break_flg:near	     ; break detected flag
+     77						     extrn   _int21_entry:far	     ; far call	system services
+     78
+     79						     include stacks.inc
+1    80				     ;
+1    81				     ; File:
+1    82				     ;			       stacks.inc
+1    83				     ; Description:
+1    84				     ;		     Macro support for register	stack frame
+1    85				     ;
+1    86				     ;			     Copyright (c) 1998
+1    87				     ;			     Pasquale J. Villani
+1    88				     ;			     All Rights	Reserved
+1    89				     ;
+1    90				     ; This file is part of DOS-C.
+1    91				     ;
+1    92				     ; DOS-C is	free software; you can redistribute it and/or
+1    93				     ; modify it under the terms of the	GNU General Public License
+1    94				     ; as published by the Free	Software Foundation; either version
+1    95				     ; 2, or (at your option) any later	version.
+1    96				     ;
+1    97				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+1    98				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+1    99				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+1   100				     ; the GNU General Public License for more details.
+1   101				     ;
+1   102				     ; You should have received	a copy of the GNU General Public
+1   103				     ; License along with DOS-C; see the file COPYING.	If not,
+1   104				     ; write to	the Free Software Foundation, 675 Mass Ave,
+1   105				     ; Cambridge, MA 02139, USA.
+1   106				     ;
+1   107				     ; $Logfile:   C:/dos-c/hdr/stacks.inv  $
+1   108				     ;
+1   109				     ; $Header:	  C:/dos-c/hdr/stacks.inv   1.0	  07 Feb 1998 20:59:16	 patv  $
+1   110				     ;
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 3
+PROCSUPT.ASM
+
+
+
+1   111				     ; $Log:   C:/dos-c/hdr/stacks.inv	$
+1   112				     ;
+1   113				     ;	 Rev 1.0   07 Feb 1998 20:59:16	  patv
+1   114				     ;Modified stack frame to match DOS	standard
+1   115				     ; $EndLog$
+1   116
+1   117
+1   118				     ;
+1   119				     ; Standard	stack frame used throughout DOS-C
+1   120				     ;
+1   121				     ;	     MS-DOS specific
+1   122				     ;
+1   123				     ;	     +---------------+
+1   124				     ;	     |	  irp hi     |	     26
+1   125				     ;	     +---------------+
+1   126				     ;	     |	  irp low    |	     24
+1   127				     ;	     +---------------+
+1   128				     ;	     |	   flags     |	     22
+1   129				     ;	     +---------------+
+1   130				     ;	     |	     cs	     |	     20
+1   131				     ;	     +---------------+
+1   132				     ;	     |	     ip	     |	     18
+1   133				     ;	     +---------------+
+1   134				     ;	     |	     es	     |	     16
+1   135				     ;	     +---------------+
+1   136				     ;	     |	     ds	     |	     14
+1   137				     ;	     +---------------+
+1   138				     ;	     |	     bp	     |	     12
+1   139				     ;	     +---------------+
+1   140				     ;	     |	     di	     |	     10
+1   141				     ;	     +---------------+
+1   142				     ;	     |	     si	     |	     8
+1   143				     ;	     +---------------+
+1   144				     ;	     |	     dx	     |	     6
+1   145				     ;	     +---------------+
+1   146				     ;	     |	     cx	     |	     4
+1   147				     ;	     +---------------+
+1   148				     ;	     |	     bx	     |	     2
+1   149				     ;	     +---------------+
+1   150				     ;	     |	     ax	     |	     0
+1   151				     ;	     +---------------+
+1   152				     ;
+1   153
+1   154	*000			     RegFrame	     struc
+1   155	*000  01*(0000)				     reg_ax	     dw	(?)
+1   156	*002  01*(0000)				     reg_bx	     dw	(?)
+1   157	*004  01*(0000)				     reg_cx	     dw	(?)
+1   158	*006  01*(0000)				     reg_dx	     dw	(?)
+1   159	*008  01*(0000)				     reg_si	     dw	(?)
+1   160	*00A  01*(0000)				     reg_di	     dw	(?)
+1   161	*00C  01*(0000)				     reg_bp	     dw	(?)
+1   162	*00E  01*(0000)				     reg_ds	     dw	(?)
+1   163	*010  01*(0000)				     reg_es	     dw	(?)
+1   164	*012  01*(0000)				     reg_ip	     dw	(?)
+1   165	*014  01*(0000)				     reg_cs	     dw	(?)
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 4
+PROCSUPT.ASM
+
+
+
+1   166	*016  01*(0000)				     reg_flags	     dw	(?)
+1   167	*018  01*(0000)				     irp_low	     dw	(?)
+1   168	*01A  01*(0000)				     irp_hi	     dw	(?)
+1   169	*01C					     ends
+1   170
+1   171
+1   172				     PUSH$ALL	     macro
+1   173						     push    es
+1   174						     push    ds
+1   175						     push    bp
+1   176						     push    di
+1   177						     push    si
+1   178						     push    dx
+1   179						     push    cx
+1   180						     push    bx
+1   181						     push    ax
+1   182						     endm
+1   183
+1   184				     POP$ALL	     macro
+1   185						     pop     ax
+1   186						     pop     bx
+1   187						     pop     cx
+1   188						     pop     dx
+1   189						     pop     si
+1   190						     pop     di
+1   191						     pop     bp
+1   192						     pop     ds
+1   193						     pop     es
+1   194						     endm
+1   195
+1   196
+    197
+    198	0000			     _TEXT	     segment
+    199						     assume  cs: _TEXT
+    200
+    201				     ;
+    202				     ;	     Special call for switching	processes
+    203				     ;
+    204				     ;	     void interrupt far	exec_user(irp)
+    205				     ;	     iregs far *irp;
+    206				     ;
+    207						     public  _exec_user
+    208	0000			     _exec_user	     proc far
+    209
+    210						     PUSH$ALL
+1   211	0000  06				     push    es
+1   212	0001  1E				     push    ds
+1   213	0002  55				     push    bp
+1   214	0003  57				     push    di
+1   215	0004  56				     push    si
+1   216	0005  52				     push    dx
+1   217	0006  51				     push    cx
+1   218	0007  53				     push    bx
+1   219	0008  50				     push    ax
+    220	0009  B8 0000s				     mov     ax,DGROUP
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 5
+PROCSUPT.ASM
+
+
+
+    221	000C  8E D8				     mov     ds,ax
+    222	000E  8B EC				     mov     bp,sp
+    223	0010  FC				     cld
+    224	0011  FA				     cli
+    225				     ;
+    226				     ;
+    227				     ;
+    228	0012  8B 46 18				     mov     ax,WORD PTR [bp.irp_low]	     ; irp (user ss:sp)
+    229	0015  8B 56 1A				     mov     dx,WORD PTR [bp.irp_hi]
+    230	0018  8B E0				     mov     sp,ax		     ; set-up user stack
+    231	001A  8E D2				     mov     ss,dx
+    232	001C  FB				     sti
+    233				     ;
+    234						     POP$ALL
+1   235	001D  58				     pop     ax
+1   236	001E  5B				     pop     bx
+1   237	001F  59				     pop     cx
+1   238	0020  5A				     pop     dx
+1   239	0021  5E				     pop     si
+1   240	0022  5F				     pop     di
+1   241	0023  5D				     pop     bp
+1   242	0024  1F				     pop     ds
+1   243	0025  07				     pop     es
+    244	0026  CF				     iret
+    245
+    246	0027			     _exec_user		     endp
+    247
+    248
+    249
+    250
+    251
+    252				     ;
+    253				     ;	     Special call for switching	processes during break handling
+    254				     ;
+    255				     ;	     void interrupt far	handle_break()
+    256				     ;
+    257				     ;
+    258				     ;	     +---------------+
+    259				     ;	     |	   flags     |	     22
+    260				     ;	     +---------------+
+    261				     ;	     |	     cs	     |	     20
+    262				     ;	     +---------------+
+    263				     ;	     |	     ip	     |	     18
+    264				     ;	     +---------------+
+    265				     ;	     |	     es	     |	     16
+    266				     ;	     +---------------+
+    267				     ;	     |	     ds	     |	     14
+    268				     ;	     +---------------+
+    269				     ;	     |	     bp	     |	     12
+    270				     ;	     +---------------+
+    271				     ;	     |	     di	     |	     10
+    272				     ;	     +---------------+
+    273				     ;	     |	     si	     |	     8
+    274				     ;	     +---------------+
+    275				     ;	     |	     dx	     |	     6
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 6
+PROCSUPT.ASM
+
+
+
+    276				     ;	     +---------------+
+    277				     ;	     |	     cx	     |	     4
+    278				     ;	     +---------------+
+    279				     ;	     |	     bx	     |	     2
+    280				     ;	     +---------------+
+    281				     ;	     |	     ax	     |	     0	     <--- bp & sp after	mov bp,sp
+    282				     ;	     +---------------+
+    283				     ;
+    284						     public  _handle_break
+    285	0027			     _handle_break   proc far
+    286
+    287						     PUSH$ALL
+1   288	0027  06				     push    es
+1   289	0028  1E				     push    ds
+1   290	0029  55				     push    bp
+1   291	002A  57				     push    di
+1   292	002B  56				     push    si
+1   293	002C  52				     push    dx
+1   294	002D  51				     push    cx
+1   295	002E  53				     push    bx
+1   296	002F  50				     push    ax
+    297	0030  B8 0000s				     mov     ax,DGROUP
+    298	0033  8E D8				     mov     ds,ax
+    299	0035  8B EC				     mov     bp,sp
+    300						     assume DS:	DGROUP
+    301	0037  FC				     cld
+    302
+    303						     ; handler body - start out	by restoring stack
+    304	0038  9C				     pushf
+    305	0039  FA				     cli
+    306
+    307						     ; save background stack
+    308	003A  8C 16 0000e			     mov     word ptr DGROUP:_api_ss,ss
+    309	003E  89 26 0000e			     mov     word ptr DGROUP:_api_sp,sp
+    310
+    311						     ; restore foreground stack	here
+    312	0042  8E 16 0000e			     mov     ss,word ptr DGROUP:_usr_ss
+    313	0046  8B 26 0000e			     mov     sp,word ptr DGROUP:_usr_sp
+    314
+    315						     ; get all the user	registers back
+    316						     POP$ALL
+1   317	004A  58				     pop     ax
+1   318	004B  5B				     pop     bx
+1   319	004C  59				     pop     cx
+1   320	004D  5A				     pop     dx
+1   321	004E  5E				     pop     si
+1   322	004F  5F				     pop     di
+1   323	0050  5D				     pop     bp
+1   324	0051  1F				     pop     ds
+1   325	0052  07				     pop     es
+    326
+    327						     ; do the int 23 handler and see if	it returns
+    328	0053  CD 23				     int     23h
+    329
+    330						     ; we're back, must	have been users	handler
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 7
+PROCSUPT.ASM
+
+
+
+    331						     PUSH$ALL
+1   332	0055  06				     push    es
+1   333	0056  1E				     push    ds
+1   334	0057  55				     push    bp
+1   335	0058  57				     push    di
+1   336	0059  56				     push    si
+1   337	005A  52				     push    dx
+1   338	005B  51				     push    cx
+1   339	005C  53				     push    bx
+1   340	005D  50				     push    ax
+    341	005E  8B EC				     mov     bp,sp
+    342	0060  B8 0000s				     mov     ax,DGROUP
+    343	0063  8E D8				     mov     ds,ax
+    344						     assume DS:	DGROUP
+    345
+    346						     ; test for	far return or iret
+    347	0065  3B 26 0000e			     cmp     sp,_usr_sp
+    348	0069  74 00				     jz	     hbrk1	     ; it was far ret
+    349
+    350						     ; restart int 21 from the top
+    351	006B			     hbrk1:	     POP$ALL
+1   352	006B  58				     pop     ax
+1   353	006C  5B				     pop     bx
+1   354	006D  59				     pop     cx
+1   355	006E  5A				     pop     dx
+1   356	006F  5E				     pop     si
+1   357	0070  5F				     pop     di
+1   358	0071  5D				     pop     bp
+1   359	0072  1F				     pop     ds
+1   360	0073  07				     pop     es
+    361	0074  9A 00000000se			     call    _int21_entry
+    362	0079  CF				     iret
+    363
+    364	007A  9D		     hbrk2:	     popf		     ; clear the flag from the stack
+    365	007B  73 EE				     jnc     hbrk1	     ; user wants to restart
+    366						     POP$ALL
+1   367	007D  58				     pop     ax
+1   368	007E  5B				     pop     bx
+1   369	007F  59				     pop     cx
+1   370	0080  5A				     pop     dx
+1   371	0081  5E				     pop     si
+1   372	0082  5F				     pop     di
+1   373	0083  5D				     pop     bp
+1   374	0084  1F				     pop     ds
+1   375	0085  07				     pop     es
+    376	0086  B8 4C00				     mov     ax,4c00h	     ; exit
+    377	0089  C6 06 0000e FF			     mov     byte ptr _break_flg,0ffh ;	set break detected flag
+    378	008E  9A 00000000se			     call    _int21_entry
+    379	0093  CF				     iret
+    380
+    381
+    382	0094			     _handle_break   endp
+    383
+    384
+    385				     ;
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 8
+PROCSUPT.ASM
+
+
+
+    386				     ; interrupt enable	and disable routines
+    387				     ;
+    388						     public  _enable
+    389	0094			     _enable	     proc near
+    390	0094  FB				     sti
+    391	0095  C3				     ret
+    392	0096			     _enable	     endp
+    393
+    394						     public  _disable
+    395	0096			     _disable	     proc near
+    396	0096  FA				     cli
+    397	0097  C3				     ret
+    398	0098			     _disable	     endp
+    399
+    400	0098			     _TEXT	     ends
+    401
+    402						     end
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 9
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "12/06/98"
+??FILENAME			  Text	 "PROCSUPT"
+??TIME				  Text	 "09:46:53"
+??VERSION			  Number 030A
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _TEXT
+@FILENAME			  Text	 PROCSUPT
+@WORDSIZE			  Text	 2
+HBRK1				  Near	 _TEXT:006B
+HBRK2				  Near	 _TEXT:007A
+STANDALONE			  Text	 1
+_API_SP	(_api_sp)		  Word	 ----:---- Extern
+_API_SS	(_api_ss)		  Word	 ----:---- Extern
+_BREAK_FLG (_break_flg)		  Near	 ----:---- Extern
+_DISABLE (_disable)		  Near	 _TEXT:0096
+_ENABLE	(_enable)		  Near	 _TEXT:0094
+_EXEC_USER (_exec_user)		  Far	 _TEXT:0000
+_HANDLE_BREAK (_handle_break)	  Far	 _TEXT:0027
+_INT21_ENTRY (_int21_entry)	  Far	 ----:---- Extern
+_KSTACKP (_kstackp)		  Near	 ----:---- Extern
+_USR_SP	(_usr_sp)		  Word	 ----:---- Extern
+_USR_SS	(_usr_ss)		  Word	 ----:---- Extern
+_USTACKP (_ustackp)		  Near	 ----:---- Extern
+
+Macro Name
+
+POP$ALL
+PUSH$ALL
+
+Structure Name			  Type	Offset
+
+REGFRAME
+ REG_AX				  Word	 0000
+ REG_BX				  Word	 0002
+ REG_CX				  Word	 0004
+ REG_DX				  Word	 0006
+ REG_SI				  Word	 0008
+ REG_DI				  Word	 000A
+ REG_BP				  Word	 000C
+ REG_DS				  Word	 000E
+ REG_ES				  Word	 0010
+ REG_IP				  Word	 0012
+ REG_CS				  Word	 0014
+ REG_FLAGS			  Word	 0016
+ IRP_LOW			  Word	 0018
+ IRP_HI				  Word	 001A
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _BSS				  16  0000 Word	  Public  BSS
+  _BSSEND			  16  0000 Byte	  Public  STACK
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:53	    Page 10
+Symbol Table
+
+
+
+  _DATA				  16  0000 Word	  Public  DATA
+_TEXT				  16  0098 Byte	  Public  CODE
+

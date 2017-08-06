@@ -1,0 +1,127 @@
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:52	    Page 1
+int2f.ASM
+
+
+
+      1				     ;
+      2				     ; File:
+      3				     ;				 int2f.asm
+      4				     ; Description:
+      5				     ;		       multiplex interrupt support code
+      6				     ;
+      7				     ;			  Copyright (c)	1996, 1998
+      8				     ;			     Pasquale J. Villani
+      9				     ;			     All Rights	Reserved
+     10				     ;
+     11				     ; This file is part of DOS-C.
+     12				     ;
+     13				     ; DOS-C is	free software; you can redistribute it and/or
+     14				     ; modify it under the terms of the	GNU General Public License
+     15				     ; as published by the Free	Software Foundation; either version
+     16				     ; 2, or (at your option) any later	version.
+     17				     ;
+     18				     ; DOS-C is	distributed in the hope	that it	will be	useful,	but
+     19				     ; WITHOUT ANY WARRANTY; without even the implied warranty of
+     20				     ; MERCHANTABILITY or FITNESS FOR A	PARTICULAR PURPOSE.  See
+     21				     ; the GNU General Public License for more details.
+     22				     ;
+     23				     ; You should have received	a copy of the GNU General Public
+     24				     ; License along with DOS-C; see the file COPYING.	If not,
+     25				     ; write to	the Free Software Foundation, 675 Mass Ave,
+     26				     ; Cambridge, MA 02139, USA.
+     27				     ;
+     28				     ; $Logfile:   C:/usr/patv/dos-c/src/kernel/int2f.asv  $
+     29				     ;
+     30				     ; $Header:	  C:/usr/patv/dos-c/src/kernel/int2f.asv   1.2	 06 Dec	1998  8:48:12	patv  $
+     31				     ;
+     32				     ; $Log:   C:/usr/patv/dos-c/src/kernel/int2f.asv  $
+     33				     ;
+     34				     ;	  Rev 1.2   06 Dec 1998	 8:48:12   patv
+     35				     ; Bug fixes.
+     36				     ;
+     37				     ;	  Rev 1.1   29 May 1996	21:03:46   patv
+     38				     ; bug fixes for v0.91a
+     39				     ;
+     40				     ;	  Rev 1.0   19 Feb 1996	 3:34:38   patv
+     41				     ; Initial revision.
+     42				     ; $EndLog$
+     43				     ;
+     44
+     45
+     46	0000			     _TEXT	     segment byte public 'CODE'
+     47				     DGROUP	     group   _DATA,_BSS,_BSSEND		     ; small model
+     48						     assume  cs:_TEXT,ds:DGROUP,ss:DGROUP
+     49	0000			     _TEXT	     ends
+     50
+     51	0000			     _DATA	     segment word public 'DATA'
+     52	0000			     _DATA	     ends
+     53
+     54	0000			     _BSS	     segment word public 'BSS'
+     55	0000			     _BSS	     ends
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:52	    Page 2
+int2f.ASM
+
+
+
+     56
+     57	0000			     _BSSEND	     segment byte public 'STACK'
+     58	0000			     _BSSEND	     ends
+     59
+     60
+     61
+     62	0000			     _TEXT	     segment byte public 'CODE'
+     63						     assume  cs:_TEXT
+     64
+     65						     public  _int2f_handler
+     66	0000			     _int2f_handler:
+     67	0000  FB				     sti			     ; Enable interrupts
+     68	0001  80 FC 11				     cmp     ah,11h		     ; Network interrupt?
+     69	0004  75 07				     jne     Int2f3		     ; No, continue
+     70	0006			     Int2f1:
+     71	0006  0A C0				     or	     al,al		     ; Installation check?
+     72	0008  74 00				     jz	     FarTabRetn		     ; yes, just return
+     73	000A			     Int2f2:
+     74
+     75	000A			     FarTabRetn:
+     76	000A  CA 0002				     retf    2			     ; Return far
+     77	000D			     Int2f3:
+     78	000D  80 FC 10				     cmp     ah,10h		     ; SHARE.EXE interrupt?
+     79	0010  74 F4				     je	     Int2f1		     ; yes, do installation check
+     80	0012  80 FC 14				     cmp     ah,14h		     ; NLSFUNC.EXE interrupt?
+     81	0015  74 EF				     je	     Int2f1		     ; yes, do installation check
+     82	0017  CF				     iret			     ; Default,	interrupt return
+     83
+     84	0018			     _TEXT	     ends
+     85
+     86						     end
+Turbo Assembler	 Version 3.1	    12/06/98 09:46:52	    Page 3
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "12/06/98"
+??FILENAME			  Text	 "int2f	  "
+??TIME				  Text	 "09:46:52"
+??VERSION			  Number 030A
+@CPU				  Text	 0101H
+@CURSEG				  Text	 _TEXT
+@FILENAME			  Text	 INT2F
+@WORDSIZE			  Text	 2
+FARTABRETN			  Near	 _TEXT:000A
+INT2F1				  Near	 _TEXT:0006
+INT2F2				  Near	 _TEXT:000A
+INT2F3				  Near	 _TEXT:000D
+STANDALONE			  Text	 1
+_INT2F_HANDLER (_int2f_handler)	  Near	 _TEXT:0000
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _BSS				  16  0000 Word	  Public  BSS
+  _BSSEND			  16  0000 Byte	  Public  STACK
+  _DATA				  16  0000 Word	  Public  DATA
+_TEXT				  16  0018 Byte	  Public  CODE
+
